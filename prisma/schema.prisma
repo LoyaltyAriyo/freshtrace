@@ -7,9 +7,40 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+enum FoodItemStatus {
+  ACTIVE
+  USED
+  WASTED
+}
+
+enum FoodItemSource {
+  RECEIPT
+  MANUAL
+}
+
+enum ReceiptOcrStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  FALLBACK
+}
+
+enum ReceiptUploadStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum PriorityGroup {
+  HIGH
+  MEDIUM
+  LOW
+}
+
 model Category {
   id            String   @id @default(uuid())
   name          String   @unique
+  priorityGroup PriorityGroup
   shelfLifeDays Int
   createdAt     DateTime @default(now())
 
@@ -18,10 +49,11 @@ model Category {
 }
 
 model Receipt {
-  id         String   @id @default(uuid())
-  imagePath  String
-  ocrStatus  String
-  uploadedAt DateTime @default(now())
+  id           String              @id @default(uuid())
+  imagePath    String
+  uploadStatus ReceiptUploadStatus @default(PENDING)
+  ocrStatus    ReceiptOcrStatus    @default(PENDING)
+  uploadedAt   DateTime            @default(now())
 
   drafts ReceiptItemDraft[]
   items  FoodItem[]
@@ -34,24 +66,24 @@ model ReceiptItemDraft {
   isSelected Boolean  @default(true)
   createdAt  DateTime @default(now())
 
-  receiptId String
-  receipt   Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receiptId  String
+  receipt    Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 }
 
 model FoodItem {
-  id        String   @id @default(uuid())
-  name      String
-  quantity  Int
-  status    String
-  source    String
-  dateAdded DateTime @default(now())
+  id         String         @id @default(uuid())
+  name       String
+  quantity   Int
+  status     FoodItemStatus @default(ACTIVE)
+  source     FoodItemSource
+  dateAdded  DateTime       @default(now())
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
-  receiptId String?
-  receipt   Receipt? @relation(fields: [receiptId], references: [id])
+  receiptId  String?
+  receipt    Receipt? @relation(fields: [receiptId], references: [id])
 }
