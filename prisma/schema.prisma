@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Category {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  shelfLifeDays Int
+  createdAt     DateTime @default(now())
+
+  items      FoodItem[]
+  draftItems ReceiptItemDraft[]
+}
+
+model Receipt {
+  id         String   @id @default(uuid())
+  imagePath  String
+  ocrStatus  String
+  uploadedAt DateTime @default(now())
+
+  drafts ReceiptItemDraft[]
+  items  FoodItem[]
+}
+
+model ReceiptItemDraft {
+  id         String   @id @default(uuid())
+  name       String
+  quantity   Int
+  isSelected Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  receiptId String
+  receipt   Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+}
+
+model FoodItem {
+  id        String   @id @default(uuid())
+  name      String
+  quantity  Int
+  status    String
+  source    String
+  dateAdded DateTime @default(now())
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  receiptId String?
+  receipt   Receipt? @relation(fields: [receiptId], references: [id])
+}
