@@ -8,7 +8,11 @@
 ## Getting Started
 
 You can run the app either from the root or from the `client` folder:
-
+- Install the dependencies
+  ```bash
+  cd client
+  npm install
+  ```
 - From the root (recommended for most users):
 
   ```bash
