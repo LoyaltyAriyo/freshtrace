@@ -1,11 +1,12 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Camera, Upload, ImageIcon, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { useIsMobile } from "@/components/ui/use-mobile"
 import { cn } from "@/lib/utils"
 
 type UploadState = "idle" | "uploading" | "error"
@@ -15,8 +16,190 @@ export function ReceiptUploadForm() {
   const [progress, setProgress] = useState(0)
   const [errorMsg, setErrorMsg] = useState("")
   const [dragActive, setDragActive] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [isWebcamActive, setIsWebcamActive] = useState(false)
+  const [capturedImage, setCapturedImage] = useState<{ blob: Blob; url: string } | null>(null)
+  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [isWebcamSupported, setIsWebcamSupported] = useState(true)
+
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
   const router = useRouter()
+  const isMobile = useIsMobile()
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof navigator === "undefined") {
+      setIsWebcamSupported(false)
+      return
+    }
+
+    const hasMedia =
+      !!navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function"
+    const protocol = window.location.protocol
+    const hostname = window.location.hostname
+    const isLocalhost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "[::1]"
+    const isHttps = protocol === "https:"
+    const isSecure = isHttps || isLocalhost
+
+    if (!hasMedia || !isSecure) {
+      setIsWebcamSupported(false)
+    } else {
+      setIsWebcamSupported(true)
+    }
+
+    return () => {
+      stopWebcam()
+      if (capturedImage?.url) {
+        URL.revokeObjectURL(capturedImage.url)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function stopWebcam() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setIsWebcamActive(false)
+  }
+
+  async function startWebcam() {
+    if (!isWebcamSupported) {
+      setCameraError("Camera not supported in this browser. Please upload a file instead.")
+      return
+    }
+
+    setCameraError(null)
+
+    if (capturedImage?.url) {
+      URL.revokeObjectURL(capturedImage.url)
+    }
+    setCapturedImage(null)
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+      streamRef.current = stream
+      setIsWebcamActive(true)
+
+      // Attach stream to video element on next frame, after it mounts
+      requestAnimationFrame(() => {
+        const video = videoRef.current
+        if (!video) return
+
+        video.srcObject = stream
+
+        const play = () => {
+          video
+            .play()
+            .catch(() => {
+              // ignore play errors (e.g., autoplay restrictions)
+            })
+        }
+
+        if (video.readyState >= 2) {
+          play()
+          return
+        }
+
+        const handleLoaded = () => {
+          video.removeEventListener("loadedmetadata", handleLoaded)
+          play()
+        }
+
+        video.addEventListener("loadedmetadata", handleLoaded)
+      })
+    } catch (error: unknown) {
+      stopWebcam()
+
+      const err = error as DOMException
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        setCameraError("Camera permission denied. Please allow access in your browser settings.")
+      } else if (err?.name === "NotFoundError" || err?.name === "OverconstrainedError") {
+        setCameraError("No camera detected on this device.")
+      } else {
+        setCameraError("Failed to start camera. Please try again or use file upload.")
+      }
+    }
+  }
+
+  async function captureWebcamPhoto() {
+    const video = videoRef.current
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setCameraError("Failed to capture image. Please try again.")
+      return
+    }
+
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement("canvas")
+    }
+
+    const canvas = canvasRef.current
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+
+    const context = canvas.getContext("2d")
+    if (!context) {
+      setCameraError("Failed to capture image. Please try again.")
+      return
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((result) => resolve(result), "image/jpeg", 0.9)
+    )
+
+    if (!blob) {
+      setCameraError("Failed to capture image. Please try again.")
+      return
+    }
+
+    stopWebcam()
+
+    if (capturedImage?.url) {
+      URL.revokeObjectURL(capturedImage.url)
+    }
+
+    const url = URL.createObjectURL(blob)
+    setCapturedImage({ blob, url })
+    setCameraError(null)
+  }
+
+  async function handleUploadCaptured() {
+    if (!capturedImage) {
+      setCameraError("No captured image to upload.")
+      return
+    }
+
+    const file = new File([capturedImage.blob], "receipt-webcam.jpg", { type: "image/jpeg" })
+    await handleFile(file)
+  }
+
+  function handleRetake() {
+    if (capturedImage?.url) {
+      URL.revokeObjectURL(capturedImage.url)
+    }
+    setCapturedImage(null)
+    setCameraError(null)
+    startWebcam()
+  }
+
+  function handleCancelWebcam() {
+    stopWebcam()
+    if (capturedImage?.url) {
+      URL.revokeObjectURL(capturedImage.url)
+    }
+    setCapturedImage(null)
+    setCameraError(null)
+  }
 
   async function handleFile(file: File | undefined) {
     if (!file) return
@@ -85,28 +268,50 @@ export function ReceiptUploadForm() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="transition-all hover:border-primary/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Camera className="h-4 w-4 text-primary" />
-              Capture Photo
-            </CardTitle>
-            <CardDescription>Take a photo of your receipt using your camera</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              className="w-full"
-              onClick={() => {
-                fileRef.current?.setAttribute("capture", "environment")
-                fileRef.current?.click()
-              }}
-              disabled={state === "uploading"}
-            >
-              <Camera className="mr-2 h-4 w-4" />
-              Open Camera
-            </Button>
-          </CardContent>
-        </Card>
+        {isMobile || !isWebcamSupported ? (
+          <Card className="transition-all hover:border-primary/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Camera className="h-4 w-4 text-primary" />
+                Capture Photo
+              </CardTitle>
+              <CardDescription>Take a photo of your receipt using your camera</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <label htmlFor="receipt-camera-input" className="block">
+                <Button className="w-full" disabled={state === "uploading"}>
+                  <Camera className="mr-2 h-4 w-4" />
+                  Take Photo
+                </Button>
+              </label>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="transition-all hover:border-primary/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Camera className="h-4 w-4 text-primary" />
+                Use Webcam
+              </CardTitle>
+              <CardDescription>Use your computer&apos;s camera to capture a receipt</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button
+                className="w-full"
+                onClick={startWebcam}
+                disabled={state === "uploading" || !isWebcamSupported}
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Use Webcam
+              </Button>
+              {!isWebcamSupported && (
+                <p className="text-xs text-muted-foreground">
+                  Camera not supported in this browser. Please upload a file instead.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="transition-all hover:border-primary/30">
           <CardHeader>
@@ -117,21 +322,95 @@ export function ReceiptUploadForm() {
             <CardDescription>Select a receipt photo from your gallery or files</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                fileRef.current?.removeAttribute("capture")
-                fileRef.current?.click()
-              }}
-              disabled={state === "uploading"}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Choose File
-            </Button>
+            <label htmlFor="receipt-file-input" className="block">
+              <Button variant="outline" className="w-full" disabled={state === "uploading"}>
+                <Upload className="mr-2 h-4 w-4" />
+                Choose File
+              </Button>
+            </label>
           </CardContent>
         </Card>
       </div>
+
+      {!isMobile && (isWebcamActive || capturedImage) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {capturedImage ? "Captured Photo" : "Webcam Preview"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!capturedImage ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full max-h-80 rounded-lg bg-black object-contain"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={capturedImage.url}
+                alt="Captured receipt preview"
+                className="w-full max-h-80 rounded-lg bg-muted object-contain"
+              />
+            )}
+            {cameraError && (
+              <p className="text-xs text-destructive" aria-live="polite">
+                {cameraError}
+              </p>
+            )}
+          </CardContent>
+          <CardContent className="flex gap-2 border-t pt-4">
+            {!capturedImage ? (
+              <>
+                <Button
+                  className="flex-1"
+                  onClick={captureWebcamPhoto}
+                  disabled={state === "uploading"}
+                >
+                  Capture Photo
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleCancelWebcam}
+                  disabled={state === "uploading"}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  className="flex-1"
+                  onClick={handleUploadCaptured}
+                  disabled={state === "uploading"}
+                >
+                  Upload Photo
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleRetake}
+                  disabled={state === "uploading"}
+                >
+                  Retake
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={handleCancelWebcam}
+                  disabled={state === "uploading"}
+                >
+                  Cancel
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div
         onDragOver={(e) => {
@@ -189,10 +468,20 @@ export function ReceiptUploadForm() {
       )}
 
       <input
-        ref={fileRef}
+        id="receipt-camera-input"
         type="file"
         accept="image/*"
-        className="hidden"
+        capture="environment"
+        className="sr-only"
+        onChange={(e) => handleFile(e.target.files?.[0])}
+        aria-label="Capture receipt photo"
+      />
+
+      <input
+        id="receipt-file-input"
+        type="file"
+        accept="image/*"
+        className="sr-only"
         onChange={(e) => handleFile(e.target.files?.[0])}
         aria-label="Upload receipt image"
       />
