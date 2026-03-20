@@ -24,6 +24,8 @@ export function ReceiptUploadForm() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -278,12 +280,14 @@ export function ReceiptUploadForm() {
               <CardDescription>Take a photo of your receipt using your camera</CardDescription>
             </CardHeader>
             <CardContent>
-              <label htmlFor="receipt-camera-input" className="block">
-                <Button className="w-full" disabled={state === "uploading"}>
-                  <Camera className="mr-2 h-4 w-4" />
-                  Take Photo
-                </Button>
-              </label>
+              <Button
+                className="w-full"
+                disabled={state === "uploading"}
+                onClick={() => cameraInputRef.current?.click()}
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Take Photo
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -322,12 +326,15 @@ export function ReceiptUploadForm() {
             <CardDescription>Select a receipt photo from your gallery or files</CardDescription>
           </CardHeader>
           <CardContent>
-            <label htmlFor="receipt-file-input" className="block">
-              <Button variant="outline" className="w-full" disabled={state === "uploading"}>
-                <Upload className="mr-2 h-4 w-4" />
-                Choose File
-              </Button>
-            </label>
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={state === "uploading"}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Choose File
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -468,6 +475,7 @@ export function ReceiptUploadForm() {
       )}
 
       <input
+        ref={cameraInputRef}
         id="receipt-camera-input"
         type="file"
         accept="image/*"
@@ -478,6 +486,7 @@ export function ReceiptUploadForm() {
       />
 
       <input
+        ref={fileInputRef}
         id="receipt-file-input"
         type="file"
         accept="image/*"
