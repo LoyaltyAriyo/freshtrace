@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
   },
   "prisma": {
     "seed": "tsx ../server/prisma/seed.ts"
