@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum OcrStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  FALLBACK_USED
+}
+
+enum FoodItemStatus {
+  ACTIVE
+  USED
+  WASTED
+}
+
+enum FoodItemSource {
+  RECEIPT
+  MANUAL
+}
+
+model Category {
+  id            String            @id @default(cuid())
+  name          String            @unique
+  shelfLifeDays Int
+  draftItems    ReceiptItemDraft[]
+  foodItems     FoodItem[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model Receipt {
+  id          String            @id @default(cuid())
+  imagePath   String
+  ocrStatus   OcrStatus         @default(PENDING)
+  uploadedAt  DateTime          @default(now())
+  draftItems  ReceiptItemDraft[]
+  foodItems   FoodItem[]
+}
+
+model ReceiptItemDraft {
+  id          String    @id @default(cuid())
+  receiptId   String
+  receipt     Receipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  name        String
+  quantity    Int       @default(1)
+
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+
+  confidence  Float?
+  isSelected  Boolean   @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model FoodItem {
+  id          String          @id @default(cuid())
+  name        String
+  quantity    Int             @default(1)
+
+  categoryId  String
+  category    Category        @relation(fields: [categoryId], references: [id])
+
+  source      FoodItemSource
+  status      FoodItemStatus  @default(ACTIVE)
+
+  dateAdded   DateTime        @default(now())
+
+  receiptId   String?
+  receipt     Receipt?        @relation(fields: [receiptId], references: [id])
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}

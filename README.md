@@ -1,22 +1,36 @@
 # T5-W26-COMP231
 
+## Project Structure
+
+- `client/` – Next.js frontend application (app router, components, types).
+- `server/` – Backend code and Prisma (`server/prisma`).
+
 ## Getting Started
 
-First, run the development server:
+You can run the app either from the root or from the `client` folder:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- From the root (recommended for most users):
+
+  ```bash
+  npm run dev
+  ```
+
+- Or directly from the client app:
+
+  ```bash
+  cd client
+  npm run dev
+  # or
+  yarn dev
+  # or
+  pnpm dev
+  # or
+  bun dev
+  ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+You can start editing the main page by modifying `client/app/page.tsx`. The page auto-updates as you edit the file.
 
 # Fresh Trace
 
