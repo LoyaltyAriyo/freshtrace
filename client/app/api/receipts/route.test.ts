@@ -102,7 +102,10 @@ describe("POST /api/receipts route", () => {
 
   it("returns success JSON with receiptId for a valid upload", async () => {
     uploadMock.mockResolvedValue({ error: null })
-    createReceiptMock.mockResolvedValue({ id: "receipt-123" })
+    createReceiptMock.mockResolvedValue({
+      id: "receipt-123",
+      ocrStatus: "PENDING",
+    })
 
     const formData = new FormData()
     formData.append(
