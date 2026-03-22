@@ -105,11 +105,49 @@ describe("ReviewPage", () => {
     render(<ReviewPage />)
 
     expect(
-      await screen.findByText(/no items were detected from this receipt/i),
-    ).toBeInTheDocument()
+      await screen.findByTestId("ocr-pending"),
+    ).toHaveTextContent(/still processing your receipt/i)
 
     const confirmButton = screen.getByRole("button", { name: /confirm items/i })
     expect(confirmButton).toBeDisabled()
+  })
+
+  it("normalizes malformed draft items safely", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        id: "receipt-123",
+        ocrStatus: "SUCCESS",
+        imagePath: null,
+        draftItems: [
+          // Missing name, non-numeric quantity, missing category, invalid confidence
+          {
+            id: "draft-1",
+            quantity: "3",
+            confidence: "0.9",
+          },
+          // Invalid id should be ignored entirely
+          {
+            id: null,
+            name: "Should be skipped",
+          },
+        ],
+      }),
+    } as unknown as Response)
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<ReviewPage />)
+
+    const items = await screen.findAllByTestId("draft-item")
+    expect(items).toHaveLength(1)
+
+    expect(
+      items[0],
+    ).toHaveTextContent("(Unnamed item)")
   })
 
   it("marks items with missing or suspicious data as needing review", async () => {

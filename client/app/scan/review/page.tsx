@@ -55,6 +55,72 @@ type ItemIssue =
 
 const LOW_CONFIDENCE_THRESHOLD = 0.6
 
+function mapDraftItems(rawDraftItems: unknown): DraftItem[] {
+  if (!Array.isArray(rawDraftItems)) return []
+
+  const mapped: DraftItem[] = []
+
+  for (const raw of rawDraftItems) {
+    if (!raw || typeof raw !== "object") continue
+
+    const item = raw as Record<string, unknown>
+
+    const idValue = item.id
+    if (typeof idValue !== "string" || !idValue) continue
+
+    const nameValue = item.name
+    const name =
+      typeof nameValue === "string"
+        ? nameValue
+        : ""
+
+    const quantityValue = item.quantity
+    let quantity: number | null = null
+    if (typeof quantityValue === "number" && !Number.isNaN(quantityValue)) {
+      quantity = quantityValue
+    } else if (
+      typeof quantityValue === "string" &&
+      quantityValue.trim() !== ""
+    ) {
+      const parsed = Number(quantityValue)
+      if (!Number.isNaN(parsed)) {
+        quantity = parsed
+      }
+    }
+
+    if (quantity === null) {
+      quantity = 1
+    }
+
+    const categoryValue = item.categoryId
+    const categoryId =
+      typeof categoryValue === "string" && categoryValue.trim() !== ""
+        ? categoryValue
+        : null
+
+    const confidenceValue = item.confidence
+    const confidence =
+      typeof confidenceValue === "number" && !Number.isNaN(confidenceValue)
+        ? confidenceValue
+        : null
+
+    const isSelectedValue = item.isSelected
+    const isSelected =
+      typeof isSelectedValue === "boolean" ? isSelectedValue : true
+
+    mapped.push({
+      id: idValue,
+      name,
+      quantity,
+      categoryId,
+      confidence,
+      isSelected,
+    })
+  }
+
+  return mapped
+}
+
 function getLoadErrorContent(error: LoadError): {
   title: string
   description: string
@@ -267,10 +333,43 @@ export default function ReviewPage() {
           return
         }
 
-        const data = (await response.json()) as ReceiptReviewResponse
-        const items = Array.isArray(data.draftItems) ? data.draftItems : []
+        const data = await response.json().catch(() => null)
 
-        setReceipt({ ...data, draftItems: items })
+        if (!data || typeof data !== "object") {
+          setFetchStatus("error")
+          setLoadError({
+            type: "server",
+            message: "Received an invalid response from the server.",
+          })
+          setReceipt(null)
+          setSelectedItemIds(new Set())
+          return
+        }
+
+        const items = mapDraftItems(
+          (data as { draftItems?: unknown }).draftItems,
+        )
+
+        const rawId = (data as { id?: unknown }).id
+        const resolvedId: string =
+          typeof rawId === "string" && rawId
+            ? rawId
+            : receiptId ?? ""
+
+        const receiptData: ReceiptReviewResponse = {
+          id: resolvedId,
+          ocrStatus:
+            typeof (data as { ocrStatus?: unknown }).ocrStatus === "string"
+              ? (data as { ocrStatus?: string }).ocrStatus!
+              : "UNKNOWN",
+          imagePath:
+            typeof (data as { imagePath?: unknown }).imagePath === "string"
+              ? (data as { imagePath?: string }).imagePath!
+              : null,
+          draftItems: items,
+        }
+
+        setReceipt(receiptData)
 
         if (items.length === 0) {
           setFetchStatus("empty")
@@ -473,11 +572,21 @@ export default function ReviewPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {receipt.draftItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No items were detected from this receipt. You can go back and
-                try uploading a clearer photo, or add items manually from the
-                Manual Entry page.
-              </p>
+              receipt.ocrStatus === "PENDING" ? (
+                <p
+                  className="text-sm text-muted-foreground"
+                  data-testid="ocr-pending"
+                >
+                  We&apos;re still processing your receipt. Items will appear
+                  here once the scan is complete.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No items were detected from this receipt. You can go back and
+                  try uploading a clearer photo, or add items manually from the
+                  Manual Entry page.
+                </p>
+              )
             ) : (
               <>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
