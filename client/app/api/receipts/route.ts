@@ -9,6 +9,7 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set<string>([
   "image/png",
   "image/heic",
   "image/heif",
+  "image/webp",
 ])
 
 function buildReceiptObjectPath(file: File) {
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
 
     if (!file.type || !ALLOWED_IMAGE_MIME_TYPES.has(file.type)) {
       return Response.json(
-        { error: "Invalid file type. Please upload a JPG, PNG, or HEIC image." },
+        { error: "Invalid file type. Please upload a JPG, PNG, HEIC, or WebP image." },
         { status: 400 }
       )
     }
@@ -82,10 +83,14 @@ export async function POST(request: Request) {
         },
         select: {
           id: true,
+          ocrStatus: true,
         },
       })
 
-      return Response.json({ receiptId: receipt.id })
+      return Response.json(
+        { receiptId: receipt.id, ocrStatus: receipt.ocrStatus },
+        { status: 201 }
+      )
     } catch (dbError) {
       console.error("Error creating receipt record:", dbError)
 

@@ -117,9 +117,10 @@ describe("POST /api/receipts route", () => {
 
     const response = await POST(request)
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(201)
     const body = await response.json()
     expect(body.receiptId).toBe("receipt-123")
+    expect(body.ocrStatus).toBe("PENDING")
     expect(uploadMock).toHaveBeenCalledTimes(1)
     expect(createReceiptMock).toHaveBeenCalledTimes(1)
   })
