@@ -104,4 +104,23 @@ describe("POST /api/items/[id]/used", () => {
     const body = await response.json()
     expect(body.error).toMatch(/only active items/i)
   })
+
+  it("returns 500 when database transaction fails", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "item-1",
+      name: "Milk",
+      quantity: 2,
+      categoryId: "cat-dairy",
+      source: "MANUAL",
+      receiptId: null,
+      status: "ACTIVE",
+    })
+    transactionMock.mockRejectedValue(new Error("DB connection lost"))
+
+    const response = await POST(new Request("http://localhost/api/items/item-1/used", { method: "POST" }), makeParams("item-1"))
+
+    expect(response.status).toBe(500)
+    const body = await response.json()
+    expect(body.error).toMatch(/failed to mark item as used/i)
+  })
 })
