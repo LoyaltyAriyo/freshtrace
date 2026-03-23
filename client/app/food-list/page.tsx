@@ -108,26 +108,45 @@ export default function FoodListPage() {
     return `${count} ${count === 1 ? "item" : "items"} saved to your food list successfully.`
   }, [searchParams])
 
-  async function markUsed(id: string) {
+  async function updateItemStatus(id: string, action: "used" | "wasted") {
     setActionError("")
     setUpdatingItemId(id)
 
     try {
-      const response = await fetch(`/api/items/${id}/used`, {
+      const response = await fetch(`/api/items/${id}/${action}`, {
         method: "POST",
       })
       const data = await response.json().catch(() => null)
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to mark item as used.")
+        throw new Error(
+          data?.error ||
+            (action === "used"
+              ? "Failed to mark item as used."
+              : "Failed to mark item as wasted.")
+        )
       }
 
       await loadItems()
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to mark item as used.")
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : action === "used"
+            ? "Failed to mark item as used."
+            : "Failed to mark item as wasted."
+      )
     } finally {
       setUpdatingItemId(null)
     }
+  }
+
+  async function markUsed(id: string) {
+    await updateItemStatus(id, "used")
+  }
+
+  async function markWasted(id: string) {
+    await updateItemStatus(id, "wasted")
   }
 
   function formatDate(value: string) {
@@ -192,6 +211,13 @@ export default function FoodListPage() {
                 className="rounded-md border px-3 py-1 text-xs hover:bg-muted"
               >
                 {updatingItemId === item.id ? "Updating..." : "Used"}
+              </button>
+              <button
+                onClick={() => markWasted(item.id)}
+                disabled={updatingItemId === item.id}
+                className="rounded-md border border-red-200 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+              >
+                {updatingItemId === item.id ? "Updating..." : "Wasted"}
               </button>
             </div>
           </div>

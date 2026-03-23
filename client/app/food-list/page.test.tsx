@@ -118,4 +118,49 @@ describe("FoodListPage success confirmation", () => {
 
     expect(await screen.findByText("No items found")).toBeInTheDocument()
   })
+
+  it("marks an item as wasted and refreshes the list", async () => {
+    getSearchParamMock.mockReturnValue(null)
+
+    const fetchMock = vi
+      .fn()
+      // Initial GET /api/items
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            id: "item-2",
+            name: "Bread",
+            quantity: 1,
+            categoryName: "Pantry",
+            dateAdded: "2026-03-22T00:00:00.000Z",
+            priority: "use-later",
+          },
+        ]),
+      })
+      // POST /api/items/item-2/wasted
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ id: "item-2", status: "WASTED", changed: true }),
+      })
+      // Refresh GET /api/items after update
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([]),
+      })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<FoodListPage />)
+
+    expect(await screen.findByText("Bread")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Wasted" }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/items/item-2/wasted", { method: "POST" })
+    })
+
+    expect(await screen.findByText("No items found")).toBeInTheDocument()
+  })
 })
