@@ -26,65 +26,68 @@ export default function FoodListPage() {
   const [items, setItems] = useState<FoodListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [actionError, setActionError] = useState("")
+  const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
+
+  async function loadItems() {
+    setLoading(true)
+    setError("")
+
+    try {
+      const response = await fetch("/api/items")
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to load food items.")
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid food list response.")
+      }
+
+      const normalized: FoodListItem[] = data
+        .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+        .map((item) => {
+          const rawPriority = item.priority
+          const priority: FoodListItem["priority"] =
+            rawPriority === "use-first" || rawPriority === "use-soon" || rawPriority === "use-later"
+              ? rawPriority
+              : "use-later"
+
+          return {
+            id: typeof item.id === "string" ? item.id : "",
+            name: typeof item.name === "string" ? item.name : "Unnamed item",
+            quantity:
+              typeof item.quantity === "number" && Number.isFinite(item.quantity)
+                ? Math.max(1, Math.floor(item.quantity))
+                : 1,
+            categoryName:
+              typeof item.categoryName === "string" && item.categoryName.trim()
+                ? item.categoryName
+                : "Uncategorized",
+            dateAdded: typeof item.dateAdded === "string" ? item.dateAdded : "",
+            priority,
+          }
+        })
+        .filter((item) => item.id)
+
+      setItems(normalized)
+      setLoading(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load food items.")
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
 
-    async function loadItems() {
-      setLoading(true)
-      setError("")
-
-      try {
-        const response = await fetch("/api/items")
-        const data = await response.json().catch(() => null)
-
-        if (!response.ok) {
-          throw new Error(data?.error || "Failed to load food items.")
-        }
-
-        if (!Array.isArray(data)) {
-          throw new Error("Invalid food list response.")
-        }
-
-        const normalized: FoodListItem[] = data
-          .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
-          .map((item) => {
-            const rawPriority = item.priority
-            const priority: FoodListItem["priority"] =
-              rawPriority === "use-first" || rawPriority === "use-soon" || rawPriority === "use-later"
-                ? rawPriority
-                : "use-later"
-
-            return {
-              id: typeof item.id === "string" ? item.id : "",
-              name: typeof item.name === "string" ? item.name : "Unnamed item",
-              quantity:
-                typeof item.quantity === "number" && Number.isFinite(item.quantity)
-                  ? Math.max(1, Math.floor(item.quantity))
-                  : 1,
-              categoryName:
-                typeof item.categoryName === "string" && item.categoryName.trim()
-                  ? item.categoryName
-                  : "Uncategorized",
-              dateAdded: typeof item.dateAdded === "string" ? item.dateAdded : "",
-              priority,
-            }
-          })
-          .filter((item) => item.id)
-
-        if (!cancelled) {
-          setItems(normalized)
-          setLoading(false)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load food items.")
-          setLoading(false)
-        }
-      }
+    async function loadItemsSafe() {
+      await loadItems()
+      if (cancelled) return
     }
 
-    loadItems()
+    loadItemsSafe()
 
     return () => {
       cancelled = true
@@ -105,8 +108,26 @@ export default function FoodListPage() {
     return `${count} ${count === 1 ? "item" : "items"} saved to your food list successfully.`
   }, [searchParams])
 
-  function markUsed(id: string) {
-    setItems((prev) => prev.filter((i) => i.id !== id))
+  async function markUsed(id: string) {
+    setActionError("")
+    setUpdatingItemId(id)
+
+    try {
+      const response = await fetch(`/api/items/${id}/used`, {
+        method: "POST",
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to mark item as used.")
+      }
+
+      await loadItems()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to mark item as used.")
+    } finally {
+      setUpdatingItemId(null)
+    }
   }
 
   function formatDate(value: string) {
@@ -138,6 +159,13 @@ export default function FoodListPage() {
         </Alert>
       )}
 
+      {actionError && (
+        <Alert variant="destructive" data-testid="items-action-error">
+          <AlertTitle>Unable to update item</AlertTitle>
+          <AlertDescription>{actionError}</AlertDescription>
+        </Alert>
+      )}
+
       {loading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="items-loading">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -160,9 +188,10 @@ export default function FoodListPage() {
               </span>
               <button
                 onClick={() => markUsed(item.id)}
+                disabled={updatingItemId === item.id}
                 className="rounded-md border px-3 py-1 text-xs hover:bg-muted"
               >
-                Used
+                {updatingItemId === item.id ? "Updating..." : "Used"}
               </button>
             </div>
           </div>

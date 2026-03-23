@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 import FoodListPage from "./page"
 
@@ -72,5 +72,50 @@ describe("FoodListPage success confirmation", () => {
     expect(await screen.findByText("Banana")).toBeInTheDocument()
     expect(screen.getByText("Qty: 4")).toBeInTheDocument()
     expect(screen.getByText("Produce")).toBeInTheDocument()
+  })
+
+  it("marks an item as used and refreshes the list", async () => {
+    getSearchParamMock.mockReturnValue(null)
+
+    const fetchMock = vi
+      .fn()
+      // Initial GET /api/items
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            id: "item-1",
+            name: "Milk",
+            quantity: 1,
+            categoryName: "Dairy",
+            dateAdded: "2026-03-22T00:00:00.000Z",
+            priority: "use-soon",
+          },
+        ]),
+      })
+      // POST /api/items/item-1/used
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ id: "item-1", status: "USED", changed: true }),
+      })
+      // Refresh GET /api/items after update
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([]),
+      })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<FoodListPage />)
+
+    expect(await screen.findByText("Milk")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Used" }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/items/item-1/used", { method: "POST" })
+    })
+
+    expect(await screen.findByText("No items found")).toBeInTheDocument()
   })
 })
