@@ -1,17 +1,19 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import { Loader2 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-const mockItems = [
-  { id: "1", name: "Milk", category: "Dairy", expiryDate: "2026-03-24", priority: "use-first" },
-  { id: "2", name: "Chicken Breast", category: "Meat", expiryDate: "2026-03-23", priority: "use-first" },
-  { id: "3", name: "Apple", category: "Produce", expiryDate: "2026-03-30", priority: "use-soon" },
-  { id: "4", name: "Yogurt", category: "Dairy", expiryDate: "2026-03-28", priority: "use-soon" },
-  { id: "5", name: "Bread", category: "Pantry", expiryDate: "2026-03-25", priority: "use-later" },
-]
+type FoodListItem = {
+  id: string
+  name: string
+  quantity: number
+  categoryName: string
+  dateAdded: string
+  priority: "use-first" | "use-soon" | "use-later"
+}
 
 const priorityStyles: Record<string, string> = {
   "use-first": "bg-red-100 text-red-800",
@@ -21,7 +23,73 @@ const priorityStyles: Record<string, string> = {
 
 export default function FoodListPage() {
   const searchParams = useSearchParams()
-  const [items, setItems] = useState(mockItems)
+  const [items, setItems] = useState<FoodListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadItems() {
+      setLoading(true)
+      setError("")
+
+      try {
+        const response = await fetch("/api/items")
+        const data = await response.json().catch(() => null)
+
+        if (!response.ok) {
+          throw new Error(data?.error || "Failed to load food items.")
+        }
+
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid food list response.")
+        }
+
+        const normalized: FoodListItem[] = data
+          .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+          .map((item) => {
+            const rawPriority = item.priority
+            const priority: FoodListItem["priority"] =
+              rawPriority === "use-first" || rawPriority === "use-soon" || rawPriority === "use-later"
+                ? rawPriority
+                : "use-later"
+
+            return {
+              id: typeof item.id === "string" ? item.id : "",
+              name: typeof item.name === "string" ? item.name : "Unnamed item",
+              quantity:
+                typeof item.quantity === "number" && Number.isFinite(item.quantity)
+                  ? Math.max(1, Math.floor(item.quantity))
+                  : 1,
+              categoryName:
+                typeof item.categoryName === "string" && item.categoryName.trim()
+                  ? item.categoryName
+                  : "Uncategorized",
+              dateAdded: typeof item.dateAdded === "string" ? item.dateAdded : "",
+              priority,
+            }
+          })
+          .filter((item) => item.id)
+
+        if (!cancelled) {
+          setItems(normalized)
+          setLoading(false)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load food items.")
+          setLoading(false)
+        }
+      }
+    }
+
+    loadItems()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const saveSuccessMessage = useMemo(() => {
     if (searchParams.get("saved") !== "1") {
@@ -41,6 +109,12 @@ export default function FoodListPage() {
     setItems((prev) => prev.filter((i) => i.id !== id))
   }
 
+  function formatDate(value: string) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return "Unknown"
+    return date.toLocaleDateString()
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -57,13 +131,28 @@ export default function FoodListPage() {
         </Alert>
       )}
 
+      {error && (
+        <Alert variant="destructive" data-testid="items-load-error">
+          <AlertTitle>Unable to load items</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {loading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="items-loading">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Loading your food list...</span>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
-        {items.map((item) => (
+        {!loading && items.map((item) => (
           <div key={item.id} className="flex items-center justify-between rounded-lg border p-4">
             <div className="flex flex-col gap-1">
               <span className="font-medium">{item.name}</span>
-              <span className="text-sm text-muted-foreground">{item.category}</span>
-              <span className="text-sm text-muted-foreground">Expires: {item.expiryDate}</span>
+              <span className="text-sm text-muted-foreground">{item.categoryName}</span>
+              <span className="text-sm text-muted-foreground">Qty: {item.quantity}</span>
+              <span className="text-sm text-muted-foreground">Added: {formatDate(item.dateAdded)}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className={`rounded-full px-3 py-1 text-xs font-medium ${priorityStyles[item.priority]}`}>
@@ -79,7 +168,7 @@ export default function FoodListPage() {
           </div>
         ))}
 
-        {items.length === 0 && (
+        {!loading && items.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <p className="text-sm font-medium">No items found</p>
             <p className="text-xs text-muted-foreground">Your kitchen is empty. Add some items to get started!</p>
