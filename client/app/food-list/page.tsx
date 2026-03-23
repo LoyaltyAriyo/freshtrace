@@ -1,6 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 const mockItems = [
   { id: "1", name: "Milk", category: "Dairy", expiryDate: "2026-03-24", priority: "use-first" },
@@ -17,7 +20,22 @@ const priorityStyles: Record<string, string> = {
 }
 
 export default function FoodListPage() {
+  const searchParams = useSearchParams()
   const [items, setItems] = useState(mockItems)
+
+  const saveSuccessMessage = useMemo(() => {
+    if (searchParams.get("saved") !== "1") {
+      return null
+    }
+
+    const rawCount = Number(searchParams.get("count"))
+    if (!Number.isFinite(rawCount) || rawCount <= 0) {
+      return "Items saved to your food list successfully."
+    }
+
+    const count = Math.floor(rawCount)
+    return `${count} ${count === 1 ? "item" : "items"} saved to your food list successfully.`
+  }, [searchParams])
 
   function markUsed(id: string) {
     setItems((prev) => prev.filter((i) => i.id !== id))
@@ -31,6 +49,13 @@ export default function FoodListPage() {
           {items.length} active items in your kitchen
         </p>
       </div>
+
+      {saveSuccessMessage && (
+        <Alert data-testid="save-success">
+          <AlertTitle>Items saved</AlertTitle>
+          <AlertDescription>{saveSuccessMessage}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex flex-col gap-2">
         {items.map((item) => (

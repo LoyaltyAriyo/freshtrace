@@ -250,4 +250,47 @@ describe("ReviewPage", () => {
     // Only the initial GET should have been called – no POST
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
+
+  it("redirects to food list with success query params after saving selected items", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({
+          id: "receipt-123",
+          ocrStatus: "SUCCESS",
+          imagePath: "uploads/receipt.jpg",
+          draftItems: [
+            {
+              id: "draft-1",
+              name: "Milk",
+              quantity: 2,
+              categoryId: "cat-dairy",
+              confidence: 0.9,
+              isSelected: true,
+            },
+          ],
+        }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: vi.fn().mockResolvedValue({ savedCount: 1 }),
+      } as unknown as Response)
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<ReviewPage />)
+
+    await screen.findByText("Milk")
+
+    fireEvent.click(screen.getByRole("button", { name: /confirm items/i }))
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/food-list?saved=1&count=1")
+    })
+  })
 })

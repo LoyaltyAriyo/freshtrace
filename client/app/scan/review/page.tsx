@@ -248,7 +248,7 @@ function hasBlockingIssues(issues: ItemIssue[]): boolean {
 async function saveReviewedItems(
   receiptId: string,
   selectedItemIds: string[],
-): Promise<SaveError | null> {
+): Promise<{ error: SaveError | null; savedCount: number }> {
   let response: Response
 
   try {
@@ -258,17 +258,26 @@ async function saveReviewedItems(
       body: JSON.stringify({ selectedItemIds }),
     })
   } catch {
-    return { type: "network" }
+    return { error: { type: "network" }, savedCount: 0 }
   }
 
-  if (response.ok) return null
+  if (response.ok) {
+    const data = await response.json().catch(() => null)
+    const rawSavedCount = data?.savedCount
+    const savedCount =
+      typeof rawSavedCount === "number" && Number.isFinite(rawSavedCount)
+        ? Math.max(0, Math.floor(rawSavedCount))
+        : selectedItemIds.length
+
+    return { error: null, savedCount }
+  }
 
   const data = await response.json().catch(() => null)
   const message = data?.error || "An unexpected error occurred."
 
-  if (response.status === 400) return { type: "validation", message }
-  if (response.status === 422) return { type: "category_missing", message }
-  return { type: "server", message }
+  if (response.status === 400) return { error: { type: "validation", message }, savedCount: 0 }
+  if (response.status === 422) return { error: { type: "category_missing", message }, savedCount: 0 }
+  return { error: { type: "server", message }, savedCount: 0 }
 }
 
 export default function ReviewPage() {
@@ -467,15 +476,15 @@ export default function ReviewPage() {
     setSaving(true)
     setSaveError(null)
 
-    const error = await saveReviewedItems(receiptId, selectedIds)
+    const result = await saveReviewedItems(receiptId, selectedIds)
 
-    if (error) {
-      setSaveError(error)
+    if (result.error) {
+      setSaveError(result.error)
       setSaving(false)
       return
     }
 
-    router.push("/food-list")
+    router.push(`/food-list?saved=1&count=${result.savedCount}`)
   }
 
   function handleRetryLoad() {
