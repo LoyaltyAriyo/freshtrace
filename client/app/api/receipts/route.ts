@@ -1,5 +1,6 @@
 export const runtime = "nodejs"
 import { prisma } from "@/lib/prisma"
+import { ensureCategories, findCategoryIdForItemName } from "@/lib/category-utils"
 import { extractReceiptDraftItems } from "@/lib/ocr"
 import { supabaseAdmin } from "@/lib/supabase/server"
 
@@ -113,6 +114,7 @@ export async function POST(request: Request) {
         }
 
         const extraction = await extractReceiptDraftItems(storedImageBytes)
+        const categories = await ensureCategories(prisma.category)
 
         if (extraction.items.length > 0) {
           await prisma.receiptItemDraft.createMany({
@@ -120,6 +122,7 @@ export async function POST(request: Request) {
               receiptId: receipt.id,
               name: item.name,
               quantity: item.quantity,
+              categoryId: findCategoryIdForItemName(item.name, categories),
               confidence: item.confidence,
               isSelected: true,
             })),

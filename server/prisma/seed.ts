@@ -1,22 +1,10 @@
 import { PrismaClient } from "@prisma/client"
+import { DEFAULT_CATEGORIES } from "../../client/lib/category-utils"
 
 const prisma = new PrismaClient()
 
 async function main() {
-  const categories = [
-    { name: "Produce", shelfLifeDays: 7 },
-    { name: "Dairy", shelfLifeDays: 10 },
-    { name: "Meat", shelfLifeDays: 5 },
-    { name: "Seafood", shelfLifeDays: 3 },
-    { name: "Bakery", shelfLifeDays: 5 },
-    { name: "Frozen", shelfLifeDays: 90 },
-    { name: "Pantry", shelfLifeDays: 60 },
-    { name: "Beverage", shelfLifeDays: 30 },
-    { name: "Snacks", shelfLifeDays: 45 },
-    { name: "Other", shelfLifeDays: 14 },
-  ]
-
-  for (const category of categories) {
+  for (const category of DEFAULT_CATEGORIES) {
     await prisma.category.upsert({
       where: { name: category.name },
       update: { shelfLifeDays: category.shelfLifeDays },

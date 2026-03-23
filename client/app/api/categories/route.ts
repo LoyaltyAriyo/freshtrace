@@ -1,15 +1,9 @@
 import { prisma } from "@/lib/prisma"
+import { ensureCategories } from "@/lib/category-utils"
 
 export async function GET() {
   try {
-    const categories = await prisma.category.findMany({
-      select: {
-        id: true,
-        name: true,
-        shelfLifeDays: true,
-      },
-      orderBy: { name: "asc" },
-    })
+    const categories = await ensureCategories(prisma.category)
 
     return Response.json(categories)
   } catch (error) {

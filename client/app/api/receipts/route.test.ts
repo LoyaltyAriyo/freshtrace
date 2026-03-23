@@ -25,6 +25,8 @@ vi.mock("@/lib/prisma", () => {
   const createReceiptMock = vi.fn()
   const updateReceiptMock = vi.fn()
   const createDraftItemsMock = vi.fn()
+  const findCategoriesMock = vi.fn()
+  const createCategoriesMock = vi.fn()
 
   return {
     prisma: {
@@ -35,10 +37,16 @@ vi.mock("@/lib/prisma", () => {
       receiptItemDraft: {
         createMany: createDraftItemsMock,
       },
+      category: {
+        findMany: findCategoriesMock,
+        createMany: createCategoriesMock,
+      },
     },
     createReceiptMock,
     updateReceiptMock,
     createDraftItemsMock,
+    findCategoriesMock,
+    createCategoriesMock,
   }
 })
 
@@ -58,7 +66,7 @@ import { uploadMock, removeMock, downloadMock } from "@/lib/supabase/server"
 // @ts-expect-error - test-only mocked exports
 import { createReceiptMock } from "@/lib/prisma"
 // @ts-expect-error - test-only mocked exports
-import { updateReceiptMock, createDraftItemsMock } from "@/lib/prisma"
+import { updateReceiptMock, createDraftItemsMock, findCategoriesMock, createCategoriesMock } from "@/lib/prisma"
 // @ts-expect-error - test-only mocked exports
 import { extractReceiptDraftItemsMock } from "@/lib/ocr"
 
@@ -70,7 +78,14 @@ describe("POST /api/receipts route", () => {
     createReceiptMock.mockReset()
     updateReceiptMock.mockReset()
     createDraftItemsMock.mockReset()
+    findCategoriesMock.mockReset()
+    createCategoriesMock.mockReset()
     extractReceiptDraftItemsMock.mockReset()
+    findCategoriesMock.mockResolvedValue([
+      { id: "cat-dairy", name: "Dairy", shelfLifeDays: 10 },
+      { id: "cat-bakery", name: "Bakery", shelfLifeDays: 5 },
+      { id: "cat-other", name: "Other", shelfLifeDays: 14 },
+    ])
   })
 
   it("returns 400 when no file is uploaded", async () => {
@@ -171,6 +186,14 @@ describe("POST /api/receipts route", () => {
       where: { id: "receipt-123" },
       data: { ocrStatus: "SUCCESS" },
     })
+    expect(createDraftItemsMock).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          name: "Milk",
+          categoryId: "cat-dairy",
+        }),
+      ],
+    })
   })
 
   it("sets FALLBACK_USED when fallback parser extracts items", async () => {
@@ -203,6 +226,45 @@ describe("POST /api/receipts route", () => {
     expect(response.status).toBe(201)
     const body = await response.json()
     expect(body.ocrStatus).toBe("FALLBACK_USED")
+  })
+
+  it("creates default categories before matching when none exist yet", async () => {
+    uploadMock.mockResolvedValue({ error: null })
+    downloadMock.mockResolvedValue({
+      data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }),
+      error: null,
+    })
+    createReceiptMock.mockResolvedValue({ id: "receipt-123" })
+    findCategoriesMock.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      { id: "cat-dairy", name: "Dairy", shelfLifeDays: 10 },
+    ])
+    createCategoriesMock.mockResolvedValue({ count: 10 })
+    extractReceiptDraftItemsMock.mockResolvedValue({
+      items: [{ name: "Milk", quantity: 1, confidence: 0.9 }],
+      fallbackUsed: false,
+    })
+    createDraftItemsMock.mockResolvedValue({ count: 1 })
+    updateReceiptMock.mockResolvedValue({ id: "receipt-123", ocrStatus: "SUCCESS" })
+
+    const formData = new FormData()
+    formData.append(
+      "receipt",
+      new File(["data"], "receipt.jpg", { type: "image/jpeg" })
+    )
+
+    const request = new Request("http://localhost/api/receipts", {
+      method: "POST",
+      body: formData as FormData,
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(201)
+    expect(createCategoriesMock).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ name: "Dairy" }),
+      ]),
+    })
   })
 
   it("sets FAILED when OCR returns no items", async () => {

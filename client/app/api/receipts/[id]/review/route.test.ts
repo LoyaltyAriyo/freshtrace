@@ -4,6 +4,7 @@ vi.mock("@/lib/prisma", () => {
   const findUniqueMock = vi.fn()
   const createManyMock = vi.fn()
   const findCategoriesMock = vi.fn()
+  const createCategoriesMock = vi.fn()
 
   return {
     prisma: {
@@ -12,6 +13,7 @@ vi.mock("@/lib/prisma", () => {
       },
       category: {
         findMany: findCategoriesMock,
+        createMany: createCategoriesMock,
       },
       foodItem: {
         createMany: createManyMock,
@@ -20,12 +22,13 @@ vi.mock("@/lib/prisma", () => {
     findUniqueMock,
     createManyMock,
     findCategoriesMock,
+    createCategoriesMock,
   }
 })
 
 import { GET, POST } from "./route"
 // @ts-expect-error - test-only mocked exports
-import { findUniqueMock, createManyMock, findCategoriesMock } from "@/lib/prisma"
+import { findUniqueMock, createManyMock, findCategoriesMock, createCategoriesMock } from "@/lib/prisma"
 
 const RECEIPT_ID = "receipt-abc"
 
@@ -48,6 +51,8 @@ function makeParams(id = RECEIPT_ID) {
 describe("GET /api/receipts/[id]/review", () => {
   beforeEach(() => {
     findUniqueMock.mockReset()
+    findCategoriesMock.mockReset()
+    createCategoriesMock.mockReset()
   })
 
   it("returns 404 when receipt does not exist", async () => {
@@ -84,6 +89,10 @@ describe("GET /api/receipts/[id]/review", () => {
         },
       ],
     })
+    findCategoriesMock.mockResolvedValue([
+      { id: "cat-bakery", name: "Bakery", shelfLifeDays: 5 },
+      { id: "cat-dairy", name: "Dairy", shelfLifeDays: 10 },
+    ])
 
     const response = await GET(makeRequest("GET"), makeParams())
 
@@ -97,6 +106,10 @@ describe("GET /api/receipts/[id]/review", () => {
       name: "Milk",
       quantity: 2,
     })
+    expect(body.categories).toEqual([
+      { id: "cat-bakery", name: "Bakery" },
+      { id: "cat-dairy", name: "Dairy" },
+    ])
   })
 
   it("returns empty draftItems array when receipt has no draft items", async () => {
@@ -106,12 +119,18 @@ describe("GET /api/receipts/[id]/review", () => {
       imagePath: "uploads/receipt.jpg",
       draftItems: [],
     })
+    findCategoriesMock.mockResolvedValue([])
+    createCategoriesMock.mockResolvedValue({ count: 10 })
+    findCategoriesMock.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      { id: "cat-dairy", name: "Dairy", shelfLifeDays: 10 },
+    ])
 
     const response = await GET(makeRequest("GET"), makeParams())
 
     expect(response.status).toBe(200)
     const body = await response.json()
     expect(body.draftItems).toEqual([])
+    expect(body.categories).toEqual([{ id: "cat-dairy", name: "Dairy" }])
   })
 })
 

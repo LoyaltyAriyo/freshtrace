@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { ensureCategories } from "@/lib/category-utils"
 
 type Params = { params: Promise<{ id: string }> }
 type EditedItemInput = {
@@ -34,7 +35,15 @@ export async function GET(_request: Request, { params }: Params) {
     return Response.json({ error: "Receipt not found." }, { status: 404 })
   }
 
-  return Response.json(receipt)
+  const categories = await ensureCategories(prisma.category)
+
+  return Response.json({
+    ...receipt,
+    categories: categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+    })),
+  })
 }
 
 export async function POST(request: Request, { params }: Params) {

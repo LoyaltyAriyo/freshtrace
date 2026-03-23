@@ -2,24 +2,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/prisma", () => {
   const findManyMock = vi.fn()
+  const createManyMock = vi.fn()
 
   return {
     prisma: {
       category: {
         findMany: findManyMock,
+        createMany: createManyMock,
       },
     },
     findManyMock,
+    createManyMock,
   }
 })
 
 import { GET } from "./route"
 // @ts-expect-error - test-only mocked exports
-import { findManyMock } from "@/lib/prisma"
+import { createManyMock, findManyMock } from "@/lib/prisma"
 
 describe("GET /api/categories", () => {
   beforeEach(() => {
     findManyMock.mockReset()
+    createManyMock.mockReset()
   })
 
   it("returns categories sorted by name", async () => {
@@ -54,5 +58,24 @@ describe("GET /api/categories", () => {
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body.error).toMatch(/failed to load categories/i)
+  })
+
+  it("creates default categories when the table is empty", async () => {
+    findManyMock
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: "cat-1", name: "Bakery", shelfLifeDays: 5 },
+        { id: "cat-2", name: "Dairy", shelfLifeDays: 10 },
+      ])
+    createManyMock.mockResolvedValue({ count: 10 })
+
+    const response = await GET()
+
+    expect(response.status).toBe(200)
+    expect(createManyMock).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ name: "Dairy", shelfLifeDays: 10 }),
+      ]),
+    })
   })
 })

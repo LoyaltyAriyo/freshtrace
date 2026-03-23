@@ -30,6 +30,12 @@ type ReceiptReviewResponse = {
   ocrStatus: string
   imagePath: string | null
   draftItems: DraftItem[]
+  categories: CategoryOption[]
+}
+
+type CategoryOption = {
+  id: string
+  name: string
 }
 
 type FetchStatus = "idle" | "loading" | "success" | "empty" | "error"
@@ -300,6 +306,7 @@ export default function ReviewPage() {
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<SaveError | null>(null)
+  const [categories, setCategories] = useState<CategoryOption[]>([])
 
   const hasLoadError = fetchStatus === "error" && loadError
   const canConfirm =
@@ -314,6 +321,7 @@ export default function ReviewPage() {
         setFetchStatus("error")
         setLoadError({ type: "missing_receipt" })
         setReceipt(null)
+        setCategories([])
         setSelectedItemIds(new Set())
       })
       return
@@ -334,6 +342,7 @@ export default function ReviewPage() {
           setFetchStatus("error")
           setLoadError({ type: "not_found" })
           setReceipt(null)
+          setCategories([])
           setSelectedItemIds(new Set())
           return
         }
@@ -346,6 +355,7 @@ export default function ReviewPage() {
             message: data?.error,
           })
           setReceipt(null)
+          setCategories([])
           setSelectedItemIds(new Set())
           return
         }
@@ -359,6 +369,7 @@ export default function ReviewPage() {
             message: "Received an invalid response from the server.",
           })
           setReceipt(null)
+          setCategories([])
           setSelectedItemIds(new Set())
           return
         }
@@ -384,9 +395,22 @@ export default function ReviewPage() {
               ? (data as { imagePath?: string }).imagePath!
               : null,
           draftItems: items,
+          categories: Array.isArray((data as { categories?: unknown }).categories)
+            ? ((data as { categories: unknown[] }).categories ?? []).flatMap((category) => {
+                if (!category || typeof category !== "object") return []
+
+                const option = category as Record<string, unknown>
+                if (typeof option.id !== "string" || typeof option.name !== "string") {
+                  return []
+                }
+
+                return [{ id: option.id, name: option.name }]
+              })
+            : [],
         }
 
         setReceipt(receiptData)
+        setCategories(receiptData.categories)
 
         if (items.length === 0) {
           setFetchStatus("empty")
@@ -406,6 +430,7 @@ export default function ReviewPage() {
         setFetchStatus("error")
         setLoadError({ type: "network" })
         setReceipt(null)
+        setCategories([])
         setSelectedItemIds(new Set())
       }
     }
@@ -427,6 +452,10 @@ export default function ReviewPage() {
 
   const selectedCount = selectedItemIds.size
   const totalItems = receipt?.draftItems.length ?? 0
+  const categoryNameById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.name])),
+    [categories],
+  )
 
   function toggleItemSelection(id: string, checked: boolean) {
     setSelectedItemIds((prev) => {
@@ -747,14 +776,21 @@ export default function ReviewPage() {
                                 />
                               </label>
                               <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                Category ID
-                                <input
+                                Category
+                                <select
                                   className="rounded-md border bg-background px-2 py-1 text-sm text-foreground"
                                   value={item.categoryId ?? ""}
                                   onChange={(e) => updateItemCategory(item.id, e.target.value)}
                                   aria-label={`Edit category for ${displayName}`}
-                                  disabled={saving}
-                                />
+                                  disabled={saving || categories.length === 0}
+                                >
+                                  <option value="">Select category</option>
+                                  {categories.map((category) => (
+                                    <option key={category.id} value={category.id}>
+                                      {category.name}
+                                    </option>
+                                  ))}
+                                </select>
                               </label>
                             </div>
                             <div className="flex flex-wrap gap-x-4 text-xs text-muted-foreground">
@@ -763,7 +799,9 @@ export default function ReviewPage() {
                               </span>
                               <span>
                                 Category:{" "}
-                                {item.categoryId ? "Set" : "Not set"}
+                                {item.categoryId
+                                  ? (categoryNameById.get(item.categoryId) ?? "Set")
+                                  : "Not set"}
                               </span>
                             </div>
                             {issues.length > 0 && (

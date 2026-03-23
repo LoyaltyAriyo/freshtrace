@@ -16,9 +16,9 @@ CREATE TABLE "new_Category" (
     "name" TEXT NOT NULL,
     "shelfLifeDays" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-INSERT INTO "new_Category" ("createdAt", "id", "name", "shelfLifeDays") SELECT "createdAt", "id", "name", "shelfLifeDays" FROM "Category";
+INSERT INTO "new_Category" ("createdAt", "id", "name", "shelfLifeDays", "updatedAt") SELECT "createdAt", "id", "name", "shelfLifeDays", CURRENT_TIMESTAMP FROM "Category";
 DROP TABLE "Category";
 ALTER TABLE "new_Category" RENAME TO "Category";
 CREATE UNIQUE INDEX "Category_name_key" ON "Category"("name");
@@ -32,11 +32,11 @@ CREATE TABLE "new_FoodItem" (
     "dateAdded" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "receiptId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "FoodItem_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "FoodItem_receiptId_fkey" FOREIGN KEY ("receiptId") REFERENCES "Receipt" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
-INSERT INTO "new_FoodItem" ("categoryId", "dateAdded", "id", "name", "quantity", "receiptId", "source", "status") SELECT "categoryId", "dateAdded", "id", "name", "quantity", "receiptId", "source", "status" FROM "FoodItem";
+INSERT INTO "new_FoodItem" ("categoryId", "dateAdded", "id", "name", "quantity", "receiptId", "source", "status", "updatedAt") SELECT "categoryId", "dateAdded", "id", "name", "quantity", "receiptId", "source", "status", CURRENT_TIMESTAMP FROM "FoodItem";
 DROP TABLE "FoodItem";
 ALTER TABLE "new_FoodItem" RENAME TO "FoodItem";
 CREATE TABLE "new_Receipt" (
@@ -57,11 +57,11 @@ CREATE TABLE "new_ReceiptItemDraft" (
     "confidence" REAL,
     "isSelected" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "ReceiptItemDraft_receiptId_fkey" FOREIGN KEY ("receiptId") REFERENCES "Receipt" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "ReceiptItemDraft_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
-INSERT INTO "new_ReceiptItemDraft" ("categoryId", "createdAt", "id", "isSelected", "name", "quantity", "receiptId") SELECT "categoryId", "createdAt", "id", "isSelected", "name", "quantity", "receiptId" FROM "ReceiptItemDraft";
+INSERT INTO "new_ReceiptItemDraft" ("categoryId", "createdAt", "id", "isSelected", "name", "quantity", "receiptId", "updatedAt") SELECT "categoryId", "createdAt", "id", "isSelected", "name", "quantity", "receiptId", CURRENT_TIMESTAMP FROM "ReceiptItemDraft";
 DROP TABLE "ReceiptItemDraft";
 ALTER TABLE "new_ReceiptItemDraft" RENAME TO "ReceiptItemDraft";
 PRAGMA foreign_keys=ON;
