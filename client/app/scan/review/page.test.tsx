@@ -293,4 +293,44 @@ describe("ReviewPage", () => {
       expect(pushMock).toHaveBeenCalledWith("/food-list?saved=1&count=1")
     })
   })
+
+  it("shows validation error when edited quantity is invalid", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        id: "receipt-123",
+        ocrStatus: "SUCCESS",
+        imagePath: "uploads/receipt.jpg",
+        draftItems: [
+          {
+            id: "draft-1",
+            name: "Milk",
+            quantity: 2,
+            categoryId: "cat-dairy",
+            confidence: 0.9,
+            isSelected: true,
+          },
+        ],
+      }),
+    } as unknown as Response)
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<ReviewPage />)
+
+    await screen.findByText("Milk")
+
+    fireEvent.change(screen.getByLabelText("Edit quantity for Milk"), {
+      target: { value: "0" },
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /confirm items/i }))
+
+    const errorAlert = await screen.findByTestId("save-error")
+    expect(errorAlert).toHaveTextContent(/some selected items still need review/i)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

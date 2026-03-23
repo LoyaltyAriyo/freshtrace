@@ -3,11 +3,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("@/lib/prisma", () => {
   const findUniqueMock = vi.fn()
   const createManyMock = vi.fn()
+  const findCategoriesMock = vi.fn()
 
   return {
     prisma: {
       receipt: {
         findUnique: findUniqueMock,
+      },
+      category: {
+        findMany: findCategoriesMock,
       },
       foodItem: {
         createMany: createManyMock,
@@ -15,12 +19,13 @@ vi.mock("@/lib/prisma", () => {
     },
     findUniqueMock,
     createManyMock,
+    findCategoriesMock,
   }
 })
 
 import { GET, POST } from "./route"
 // @ts-expect-error - test-only mocked exports
-import { findUniqueMock, createManyMock } from "@/lib/prisma"
+import { findUniqueMock, createManyMock, findCategoriesMock } from "@/lib/prisma"
 
 const RECEIPT_ID = "receipt-abc"
 
@@ -118,6 +123,12 @@ describe("POST /api/receipts/[id]/review", () => {
   beforeEach(() => {
     findUniqueMock.mockReset()
     createManyMock.mockReset()
+    findCategoriesMock.mockReset()
+    findCategoriesMock.mockResolvedValue([
+      { id: "cat-dairy" },
+      { id: "cat-bakery" },
+      { id: "cat-other" },
+    ])
   })
 
   it("returns 400 when request body is missing selectedItemIds", async () => {
@@ -290,5 +301,104 @@ describe("POST /api/receipts/[id]/review", () => {
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body.error).toMatch(/failed to save/i)
+  })
+
+  it("returns 400 when edited item has invalid quantity", async () => {
+    const response = await POST(
+      makeRequest("POST", {
+        selectedItemIds: ["draft-1"],
+        editedItems: [
+          {
+            id: "draft-1",
+            name: "Milk",
+            quantity: 0,
+            categoryId: "cat-dairy",
+          },
+        ],
+      }),
+      makeParams()
+    )
+
+    expect(response.status).toBe(400)
+    const body = await response.json()
+    expect(body.error).toMatch(/invalid quantity/i)
+  })
+
+  it("uses edited item values when saving", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: RECEIPT_ID,
+      draftItems: [
+        {
+          id: "draft-1",
+          name: "Old Name",
+          quantity: 2,
+          categoryId: "cat-dairy",
+          isSelected: true,
+        },
+      ],
+    })
+    createManyMock.mockResolvedValue({ count: 1 })
+
+    const response = await POST(
+      makeRequest("POST", {
+        selectedItemIds: ["draft-1"],
+        editedItems: [
+          {
+            id: "draft-1",
+            name: "Updated Milk",
+            quantity: 4,
+            categoryId: "cat-bakery",
+          },
+        ],
+      }),
+      makeParams()
+    )
+
+    expect(response.status).toBe(201)
+    const createdData = createManyMock.mock.calls[0][0].data as Array<{
+      name: string
+      quantity: number
+      categoryId: string
+    }>
+    expect(createdData[0]).toMatchObject({
+      name: "Updated Milk",
+      quantity: 4,
+      categoryId: "cat-bakery",
+    })
+  })
+
+  it("returns 422 when an edited item category is invalid", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: RECEIPT_ID,
+      draftItems: [
+        {
+          id: "draft-1",
+          name: "Milk",
+          quantity: 2,
+          categoryId: "cat-dairy",
+          isSelected: true,
+        },
+      ],
+    })
+    findCategoriesMock.mockResolvedValue([])
+
+    const response = await POST(
+      makeRequest("POST", {
+        selectedItemIds: ["draft-1"],
+        editedItems: [
+          {
+            id: "draft-1",
+            name: "Milk",
+            quantity: 2,
+            categoryId: "cat-unknown",
+          },
+        ],
+      }),
+      makeParams()
+    )
+
+    expect(response.status).toBe(422)
+    const body = await response.json()
+    expect(body.error).toMatch(/invalid category/i)
   })
 })
