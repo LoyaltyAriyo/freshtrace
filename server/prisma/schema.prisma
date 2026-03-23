@@ -31,6 +31,7 @@ model Category {
   shelfLifeDays Int
   draftItems    ReceiptItemDraft[]
   foodItems     FoodItem[]
+  usedItems     UsedItem[]
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 }
@@ -41,7 +42,8 @@ model Receipt {
   ocrStatus   OcrStatus         @default(PENDING)
   uploadedAt  DateTime          @default(now())
   draftItems  ReceiptItemDraft[]
-  foodItems   FoodItem[]
+  foodItems   FoodItem[]        @relation("ReceiptFoodItems")
+  usedItems   UsedItem[]        @relation("ReceiptUsedItems")
 }
 
 model ReceiptItemDraft {
@@ -76,8 +78,29 @@ model FoodItem {
   dateAdded   DateTime        @default(now())
 
   receiptId   String?
-  receipt     Receipt?        @relation(fields: [receiptId], references: [id])
+  receipt     Receipt?        @relation("ReceiptFoodItems", fields: [receiptId], references: [id])
+  usedEntry   UsedItem?
 
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+}
+
+model UsedItem {
+  id            String         @id @default(cuid())
+  foodItemId    String         @unique
+  foodItem      FoodItem       @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
+
+  name          String
+  quantity      Int
+
+  categoryId    String
+  category      Category       @relation(fields: [categoryId], references: [id])
+
+  source        FoodItemSource
+
+  receiptId     String?
+  receipt       Receipt?       @relation("ReceiptUsedItems", fields: [receiptId], references: [id])
+
+  markedUsedAt  DateTime       @default(now())
+  createdAt     DateTime       @default(now())
 }

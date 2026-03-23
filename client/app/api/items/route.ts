@@ -1,5 +1,59 @@
 import { prisma } from "@/lib/prisma"
 
+type ItemPriority = "use-first" | "use-soon" | "use-later"
+
+function toPriority(dateAdded: Date): ItemPriority {
+  const ageInDays =
+    (Date.now() - new Date(dateAdded).getTime()) / (1000 * 60 * 60 * 24)
+
+  if (ageInDays >= 7) return "use-first"
+  if (ageInDays >= 3) return "use-soon"
+  return "use-later"
+}
+
+export async function GET() {
+  try {
+    const items = await prisma.foodItem.findMany({
+      where: {
+        status: "ACTIVE",
+      },
+      orderBy: {
+        dateAdded: "desc",
+      },
+      select: {
+        id: true,
+        name: true,
+        quantity: true,
+        dateAdded: true,
+        status: true,
+        category: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    })
+
+    const payload = items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      dateAdded: item.dateAdded,
+      status: item.status,
+      categoryName: item.category.name,
+      priority: toPriority(item.dateAdded),
+    }))
+
+    return Response.json(payload)
+  } catch (error) {
+    console.error("Failed to fetch food items:", error)
+    return Response.json(
+      { error: "Failed to load food items. Please try again." },
+      { status: 500 }
+    )
+  }
+}
+
 export async function POST(request: Request) {
   let body: unknown
   try {

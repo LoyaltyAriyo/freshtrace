@@ -248,27 +248,42 @@ function hasBlockingIssues(issues: ItemIssue[]): boolean {
 async function saveReviewedItems(
   receiptId: string,
   selectedItemIds: string[],
-): Promise<SaveError | null> {
+  editedItems: Array<{
+    id: string
+    name: string
+    quantity: number
+    categoryId: string
+  }>,
+): Promise<{ error: SaveError | null; savedCount: number }> {
   let response: Response
 
   try {
     response = await fetch(`/api/receipts/${receiptId}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ selectedItemIds }),
+      body: JSON.stringify({ selectedItemIds, editedItems }),
     })
   } catch {
-    return { type: "network" }
+    return { error: { type: "network" }, savedCount: 0 }
   }
 
-  if (response.ok) return null
+  if (response.ok) {
+    const data = await response.json().catch(() => null)
+    const rawSavedCount = data?.savedCount
+    const savedCount =
+      typeof rawSavedCount === "number" && Number.isFinite(rawSavedCount)
+        ? Math.max(0, Math.floor(rawSavedCount))
+        : selectedItemIds.length
+
+    return { error: null, savedCount }
+  }
 
   const data = await response.json().catch(() => null)
   const message = data?.error || "An unexpected error occurred."
 
-  if (response.status === 400) return { type: "validation", message }
-  if (response.status === 422) return { type: "category_missing", message }
-  return { type: "server", message }
+  if (response.status === 400) return { error: { type: "validation", message }, savedCount: 0 }
+  if (response.status === 422) return { error: { type: "category_missing", message }, savedCount: 0 }
+  return { error: { type: "server", message }, savedCount: 0 }
 }
 
 export default function ReviewPage() {
@@ -423,6 +438,45 @@ export default function ReviewPage() {
     })
   }
 
+  function updateItemName(id: string, value: string) {
+    setReceipt((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        draftItems: prev.draftItems.map((item) =>
+          item.id === id ? { ...item, name: value } : item
+        ),
+      }
+    })
+  }
+
+  function updateItemQuantity(id: string, value: string) {
+    const parsed = Number(value)
+    const quantity = Number.isFinite(parsed) ? parsed : 0
+
+    setReceipt((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        draftItems: prev.draftItems.map((item) =>
+          item.id === id ? { ...item, quantity } : item
+        ),
+      }
+    })
+  }
+
+  function updateItemCategory(id: string, value: string) {
+    setReceipt((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        draftItems: prev.draftItems.map((item) =>
+          item.id === id ? { ...item, categoryId: value.trim() || null } : item
+        ),
+      }
+    })
+  }
+
   async function handleConfirm() {
     if (!receiptId) {
       setSaveError({ type: "missing_receipt" })
@@ -467,15 +521,27 @@ export default function ReviewPage() {
     setSaving(true)
     setSaveError(null)
 
-    const error = await saveReviewedItems(receiptId, selectedIds)
+    const selectedEditedItems = receipt.draftItems
+      .filter((item) => selectedItemIds.has(item.id))
+      .map((item) => ({
+        id: item.id,
+        name: (item.name ?? "").trim(),
+        quantity:
+          typeof item.quantity === "number" && Number.isFinite(item.quantity)
+            ? Math.max(0, Math.floor(item.quantity))
+            : 0,
+        categoryId: (item.categoryId ?? "").trim(),
+      }))
 
-    if (error) {
-      setSaveError(error)
+    const result = await saveReviewedItems(receiptId, selectedIds, selectedEditedItems)
+
+    if (result.error) {
+      setSaveError(result.error)
       setSaving(false)
       return
     }
 
-    router.push("/food-list")
+    router.push(`/food-list?saved=1&count=${result.savedCount}`)
   }
 
   function handleRetryLoad() {
@@ -652,6 +718,40 @@ export default function ReviewPage() {
                                     {" confidence"}
                                   </Badge>
                                 )}
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Name
+                                <input
+                                  className="rounded-md border bg-background px-2 py-1 text-sm text-foreground"
+                                  value={item.name ?? ""}
+                                  onChange={(e) => updateItemName(item.id, e.target.value)}
+                                  aria-label={`Edit name for ${displayName}`}
+                                  disabled={saving}
+                                />
+                              </label>
+                              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Quantity
+                                <input
+                                  type="number"
+                                  min={1}
+                                  className="rounded-md border bg-background px-2 py-1 text-sm text-foreground"
+                                  value={item.quantity ?? ""}
+                                  onChange={(e) => updateItemQuantity(item.id, e.target.value)}
+                                  aria-label={`Edit quantity for ${displayName}`}
+                                  disabled={saving}
+                                />
+                              </label>
+                              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Category ID
+                                <input
+                                  className="rounded-md border bg-background px-2 py-1 text-sm text-foreground"
+                                  value={item.categoryId ?? ""}
+                                  onChange={(e) => updateItemCategory(item.id, e.target.value)}
+                                  aria-label={`Edit category for ${displayName}`}
+                                  disabled={saving}
+                                />
+                              </label>
                             </div>
                             <div className="flex flex-wrap gap-x-4 text-xs text-muted-foreground">
                               <span>
