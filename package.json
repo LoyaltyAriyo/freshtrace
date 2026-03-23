@@ -2,8 +2,8 @@
   "name": "fresh-trace-root",
   "private": true,
   "scripts": {
-    "dev": "npm run dev --prefix client",
-    "dev:client": "npm run dev --prefix client",
+    "dev": "cd client && npm run dev",
+    "dev:client": "cd client && npm run dev",
     "dev:server": "echo \"No separate server dev process yet; server/ currently only contains Prisma schema and seed.\""
   },
   "dependencies": {

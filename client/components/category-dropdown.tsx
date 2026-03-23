@@ -33,7 +33,10 @@ export function CategoryDropdown({
   useEffect(() => {
     fetch("/api/categories")
       .then((res) => res.json())
-      .then((data: Category[]) => setCategories(data))
+      .then((data: unknown) => {
+        setCategories(Array.isArray(data) ? (data as Category[]) : [])
+      })
+      .catch(() => setCategories([]))
       .finally(() => setLoading(false))
   }, [])
 
