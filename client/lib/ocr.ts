@@ -1,4 +1,20 @@
-import { parseFallbackReceiptItems } from "@/lib/fallback-parser"
+import { Buffer } from "node:buffer"
+import path from "node:path"
+import { NOISE_PATTERNS, parseFallbackReceiptItems } from "@/lib/fallback-parser"
+
+// Tesseract can be fragile in some local dev/runtime environments (for example,
+// when worker scripts cannot be resolved correctly). To keep the app stable,
+// OCR via tesseract.js is disabled by default and must be explicitly enabled
+// with an environment variable:
+//
+//   NEXT_PUBLIC_TESSERACT_ENABLED=true  (or TESSERACT_ENABLED=true)
+//
+// When disabled, this module will safely return an empty result so the rest of
+// the receipt flow can show a clear “OCR failed / no items found” state instead
+// of crashing the server.
+const TESSERACT_ENABLED =
+	process.env.NEXT_PUBLIC_TESSERACT_ENABLED === "true" ||
+	process.env.TESSERACT_ENABLED === "true"
 
 export type OcrDraftItem = {
 	name: string
@@ -18,9 +34,10 @@ function parseLineToItem(line: string, confidence: number | null): OcrDraftItem 
 		.trim()
 
 	if (!cleanLine || !/[a-z]/i.test(cleanLine)) return null
-	if (/\b(subtotal|total|tax|change|cash|visa|mastercard|receipt|thank\s*you)\b/i.test(cleanLine)) {
-		return null
-	}
+	// Treat lines that are clearly metadata (weights, dates, headers, etc.) as noise.
+	if (/^\d+(\.\d+)?\s*kg\b/i.test(cleanLine)) return null
+	if (/\bkg\b.*\$\d+[.,]\d{2}/i.test(cleanLine)) return null
+	if (NOISE_PATTERNS.some((pattern) => pattern.test(cleanLine))) return null
 
 	const startQty = cleanLine.match(/^(\d{1,3})\s*x?\s+(.+)$/i)
 	if (startQty) {
@@ -67,9 +84,33 @@ function dedupeItems(items: OcrDraftItem[]): OcrDraftItem[] {
 }
 
 export async function extractReceiptDraftItems(imageBytes: Uint8Array): Promise<OcrExtractionResult> {
+	if (!TESSERACT_ENABLED) {
+		return {
+			items: [],
+			fallbackUsed: false,
+		}
+	}
+
 	try {
 		const tesseract = await import("tesseract.js")
-		const result = await tesseract.recognize(imageBytes, "eng")
+
+		// Build an absolute filesystem path to the Node worker script based on
+		// the real working directory, instead of relying on the app-route
+		// runtime's module resolution (which was producing a non-file string).
+		const workerPath = path.join(
+			process.cwd(),
+			"node_modules",
+			"tesseract.js",
+			"src",
+			"worker-script",
+			"node",
+			"index.js",
+		)
+		// Tesseract typings expect an ImageLike (e.g. Buffer), so wrap the
+		// Uint8Array from storage in a Node Buffer for type safety.
+		const input = Buffer.from(imageBytes)
+		const recognizeOptions: Partial<Record<string, unknown>> = { workerPath }
+		const result = await tesseract.recognize(input, "eng", recognizeOptions)
 
 		const text = result?.data?.text ?? ""
 		const confidenceRaw = result?.data?.confidence
@@ -108,4 +149,3 @@ export async function extractReceiptDraftItems(imageBytes: Uint8Array): Promise<
 		}
 	}
 }
-

@@ -310,10 +310,12 @@ export default function ReviewPage() {
 
   useEffect(() => {
     if (!receiptId) {
-      setFetchStatus("error")
-      setLoadError({ type: "missing_receipt" })
-      setReceipt(null)
-      setSelectedItemIds(new Set())
+      queueMicrotask(() => {
+        setFetchStatus("error")
+        setLoadError({ type: "missing_receipt" })
+        setReceipt(null)
+        setSelectedItemIds(new Set())
+      })
       return
     }
 
@@ -643,8 +645,10 @@ export default function ReviewPage() {
                   className="text-sm text-muted-foreground"
                   data-testid="ocr-pending"
                 >
-                  We&apos;re still processing your receipt. Items will appear
-                  here once the scan is complete.
+                  We couldn&apos;t extract any items from this receipt yet. The
+                  OCR scan may have failed or is taking longer than expected.
+                  You can try uploading a clearer photo, or add items manually
+                  from the Manual Entry page.
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">

@@ -8,10 +8,17 @@ export function useIsMobile() {
   React.useEffect(() => {
     const updateIsMobile = () => {
       const widthIsMobile = window.innerWidth < MOBILE_BREAKPOINT
+      const navigatorWithVendor = window.navigator as Navigator & {
+        vendor?: string
+      }
+      const windowWithOpera = window as Window & {
+        opera?: string
+      }
       const ua =
         window.navigator.userAgent ||
-        (window.navigator as any).vendor ||
-        (window as any).opera
+        navigatorWithVendor.vendor ||
+        windowWithOpera.opera ||
+        ""
       const uaIsMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
         ua,
       )
@@ -19,8 +26,10 @@ export function useIsMobile() {
       const pointerIsCoarse =
         window.matchMedia &&
         window.matchMedia('(pointer: coarse)').matches
-      const touchPoints =
-        (window.navigator as any).maxTouchPoints ?? 0
+      const navigatorWithTouchPoints = window.navigator as Navigator & {
+        maxTouchPoints?: number
+      }
+      const touchPoints = navigatorWithTouchPoints.maxTouchPoints ?? 0
 
       setIsMobile(
         widthIsMobile ||

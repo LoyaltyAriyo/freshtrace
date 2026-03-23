@@ -48,8 +48,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${dmSans.variable} font-sans antialiased`}>
+    <html lang="en" suppressHydrationWarning>
+      <body
+        suppressHydrationWarning
+        className={`${inter.variable} ${dmSans.variable} font-sans antialiased`}
+      >
         <div className="min-h-screen bg-background">
           <AppNav />
           <main className="mx-auto max-w-6xl px-4 py-6 pb-24 md:pb-6">{children}</main>

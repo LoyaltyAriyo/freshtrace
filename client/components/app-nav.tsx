@@ -22,21 +22,15 @@ export function AppNav() {
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-1.5">
             <Image
-              src="/images/logo-icon-light.png"
+              src="/next.svg"
               alt="Fresh Trace"
               width={32}
               height={32}
-              className="md:hidden"
               priority
             />
-            <Image
-              src="/images/logo-text-light.png"
-              alt="Fresh Trace"
-              width={140}
-              height={40}
-              className="hidden md:block"
-              priority
-            />
+            <span className="hidden text-sm font-semibold tracking-tight md:inline">
+              Fresh Trace
+            </span>
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">

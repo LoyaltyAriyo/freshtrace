@@ -3,7 +3,7 @@ export type ParsedReceiptItem = {
 	quantity: number
 }
 
-const NOISE_PATTERNS = [
+export const NOISE_PATTERNS = [
 	/\bsubtotal\b/i,
 	/\btotal\b/i,
 	/\btax\b/i,
@@ -15,6 +15,16 @@ const NOISE_PATTERNS = [
 	/\bmastercard\b/i,
 	/\bthank\s*you\b/i,
 	/\breceipt\b/i,
+	/\bstore\b/i,
+	/\bsuper\s*store\b/i,
+	/\bmanager\b/i,
+	/\baccount\b/i,
+	/\bapproval\b/i,
+	/\bterminal\b/i,
+	/\bitems?\s+sold\b/i,
+	/\bcustomer\s+copy\b/i,
+	/\bdate\b/i,
+	/\b(mon|tue|wed|thu|fri|sat|sun)\b/i,
 ]
 
 function cleanupLine(rawLine: string): string {
@@ -28,6 +38,9 @@ function isLikelyNoise(line: string): boolean {
 	if (!line) return true
 	if (!/[a-z]/i.test(line)) return true
 	if (line.length < 2) return true
+	// Lines that are mostly weight/price metadata like "0.442kg NET @ $2.99/kg"
+	if (/^\d+(\.\d+)?\s*kg\b/i.test(line)) return true
+	if (/\bkg\b.*\$\d+[.,]\d{2}/i.test(line)) return true
 	return NOISE_PATTERNS.some((pattern) => pattern.test(line))
 }
 
@@ -82,4 +95,3 @@ export function parseFallbackReceiptItems(rawText: string): ParsedReceiptItem[] 
 
 	return Array.from(uniqueByName.values()).slice(0, 20)
 }
-
