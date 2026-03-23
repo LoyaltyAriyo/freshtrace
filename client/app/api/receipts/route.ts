@@ -28,6 +28,20 @@ function buildReceiptObjectPath(file: File) {
   return `uploads/${timestamp}-${uuid}-${safeName}`
 }
 
+async function downloadReceiptObjectBytes(objectPath: string): Promise<Uint8Array | null> {
+  const { data, error } = await supabaseAdmin.storage
+    .from(RECEIPTS_BUCKET)
+    .download(objectPath)
+
+  if (error || !data) {
+    console.error("Supabase Storage download error:", error)
+    return null
+  }
+
+  const arrayBuffer = await data.arrayBuffer()
+  return new Uint8Array(arrayBuffer)
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData()
@@ -90,7 +104,13 @@ export async function POST(request: Request) {
       let finalStatus: "SUCCESS" | "FAILED" | "FALLBACK_USED" = "FAILED"
 
       try {
-        const extraction = await extractReceiptDraftItems(fileBytes)
+        const storedImageBytes = await downloadReceiptObjectBytes(objectPath)
+
+        if (!storedImageBytes) {
+          throw new Error("Unable to download receipt image from storage.")
+        }
+
+        const extraction = await extractReceiptDraftItems(storedImageBytes)
 
         if (extraction.items.length > 0) {
           await prisma.receiptItemDraft.createMany({

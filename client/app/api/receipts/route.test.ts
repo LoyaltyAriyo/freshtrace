@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("@/lib/supabase/server", () => {
   const uploadMock = vi.fn()
   const removeMock = vi.fn()
+  const downloadMock = vi.fn()
 
   return {
     supabaseAdmin: {
@@ -10,11 +11,13 @@ vi.mock("@/lib/supabase/server", () => {
         from: vi.fn(() => ({
           upload: uploadMock,
           remove: removeMock,
+          download: downloadMock,
         })),
       },
     },
     uploadMock,
     removeMock,
+    downloadMock,
   }
 })
 
@@ -51,7 +54,7 @@ vi.mock("@/lib/ocr", () => {
 // Import after mocks so that the route uses the mocked dependencies
 import { POST } from "./route"
 // @ts-expect-error - test-only mocked exports
-import { uploadMock, removeMock } from "@/lib/supabase/server"
+import { uploadMock, removeMock, downloadMock } from "@/lib/supabase/server"
 // @ts-expect-error - test-only mocked exports
 import { createReceiptMock } from "@/lib/prisma"
 // @ts-expect-error - test-only mocked exports
@@ -63,6 +66,7 @@ describe("POST /api/receipts route", () => {
   beforeEach(() => {
     uploadMock.mockReset()
     removeMock.mockReset()
+    downloadMock.mockReset()
     createReceiptMock.mockReset()
     updateReceiptMock.mockReset()
     createDraftItemsMock.mockReset()
@@ -126,6 +130,10 @@ describe("POST /api/receipts route", () => {
 
   it("returns success JSON with receiptId for a valid upload", async () => {
     uploadMock.mockResolvedValue({ error: null })
+    downloadMock.mockResolvedValue({
+      data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }),
+      error: null,
+    })
     createReceiptMock.mockResolvedValue({
       id: "receipt-123",
     })
@@ -156,6 +164,7 @@ describe("POST /api/receipts route", () => {
     expect(body.receiptId).toBe("receipt-123")
     expect(body.ocrStatus).toBe("SUCCESS")
     expect(uploadMock).toHaveBeenCalledTimes(1)
+    expect(downloadMock).toHaveBeenCalledTimes(1)
     expect(createReceiptMock).toHaveBeenCalledTimes(1)
     expect(createDraftItemsMock).toHaveBeenCalledTimes(1)
     expect(updateReceiptMock).toHaveBeenCalledWith({
@@ -166,6 +175,10 @@ describe("POST /api/receipts route", () => {
 
   it("sets FALLBACK_USED when fallback parser extracts items", async () => {
     uploadMock.mockResolvedValue({ error: null })
+    downloadMock.mockResolvedValue({
+      data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }),
+      error: null,
+    })
     createReceiptMock.mockResolvedValue({ id: "receipt-123" })
     extractReceiptDraftItemsMock.mockResolvedValue({
       items: [{ name: "Bread", quantity: 1, confidence: null }],
@@ -194,6 +207,10 @@ describe("POST /api/receipts route", () => {
 
   it("sets FAILED when OCR returns no items", async () => {
     uploadMock.mockResolvedValue({ error: null })
+    downloadMock.mockResolvedValue({
+      data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }),
+      error: null,
+    })
     createReceiptMock.mockResolvedValue({ id: "receipt-123" })
     extractReceiptDraftItemsMock.mockResolvedValue({
       items: [],
@@ -218,6 +235,31 @@ describe("POST /api/receipts route", () => {
     const body = await response.json()
     expect(body.ocrStatus).toBe("FAILED")
     expect(createDraftItemsMock).not.toHaveBeenCalled()
+  })
+
+  it("sets FAILED when uploaded object cannot be downloaded for OCR", async () => {
+    uploadMock.mockResolvedValue({ error: null })
+    downloadMock.mockResolvedValue({ data: null, error: new Error("download failed") })
+    createReceiptMock.mockResolvedValue({ id: "receipt-123" })
+    updateReceiptMock.mockResolvedValue({ id: "receipt-123", ocrStatus: "FAILED" })
+
+    const formData = new FormData()
+    formData.append(
+      "receipt",
+      new File(["data"], "receipt.jpg", { type: "image/jpeg" })
+    )
+
+    const request = new Request("http://localhost/api/receipts", {
+      method: "POST",
+      body: formData as any,
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(201)
+    const body = await response.json()
+    expect(body.ocrStatus).toBe("FAILED")
+    expect(extractReceiptDraftItemsMock).not.toHaveBeenCalled()
   })
 
   it("handles storage upload failure", async () => {
