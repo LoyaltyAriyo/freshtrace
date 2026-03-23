@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { extractReceiptDraftItems } from "@/lib/ocr"
 import { supabaseAdmin } from "@/lib/supabase/server"
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
@@ -83,12 +84,43 @@ export async function POST(request: Request) {
         },
         select: {
           id: true,
-          ocrStatus: true,
+        },
+      })
+
+      let finalStatus: "SUCCESS" | "FAILED" | "FALLBACK_USED" = "FAILED"
+
+      try {
+        const extraction = await extractReceiptDraftItems(fileBytes)
+
+        if (extraction.items.length > 0) {
+          await prisma.receiptItemDraft.createMany({
+            data: extraction.items.map((item) => ({
+              receiptId: receipt.id,
+              name: item.name,
+              quantity: item.quantity,
+              confidence: item.confidence,
+              isSelected: true,
+            })),
+          })
+
+          finalStatus = extraction.fallbackUsed ? "FALLBACK_USED" : "SUCCESS"
+        } else {
+          finalStatus = "FAILED"
+        }
+      } catch (ocrError) {
+        console.error("OCR extraction failed:", ocrError)
+        finalStatus = "FAILED"
+      }
+
+      await prisma.receipt.update({
+        where: { id: receipt.id },
+        data: {
+          ocrStatus: finalStatus,
         },
       })
 
       return Response.json(
-        { receiptId: receipt.id, ocrStatus: receipt.ocrStatus },
+        { receiptId: receipt.id, ocrStatus: finalStatus },
         { status: 201 }
       )
     } catch (dbError) {

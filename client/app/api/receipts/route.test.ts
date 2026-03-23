@@ -20,14 +20,31 @@ vi.mock("@/lib/supabase/server", () => {
 
 vi.mock("@/lib/prisma", () => {
   const createReceiptMock = vi.fn()
+  const updateReceiptMock = vi.fn()
+  const createDraftItemsMock = vi.fn()
 
   return {
     prisma: {
       receipt: {
         create: createReceiptMock,
+        update: updateReceiptMock,
+      },
+      receiptItemDraft: {
+        createMany: createDraftItemsMock,
       },
     },
     createReceiptMock,
+    updateReceiptMock,
+    createDraftItemsMock,
+  }
+})
+
+vi.mock("@/lib/ocr", () => {
+  const extractReceiptDraftItemsMock = vi.fn()
+
+  return {
+    extractReceiptDraftItems: extractReceiptDraftItemsMock,
+    extractReceiptDraftItemsMock,
   }
 })
 
@@ -37,12 +54,19 @@ import { POST } from "./route"
 import { uploadMock, removeMock } from "@/lib/supabase/server"
 // @ts-expect-error - test-only mocked exports
 import { createReceiptMock } from "@/lib/prisma"
+// @ts-expect-error - test-only mocked exports
+import { updateReceiptMock, createDraftItemsMock } from "@/lib/prisma"
+// @ts-expect-error - test-only mocked exports
+import { extractReceiptDraftItemsMock } from "@/lib/ocr"
 
 describe("POST /api/receipts route", () => {
   beforeEach(() => {
     uploadMock.mockReset()
     removeMock.mockReset()
     createReceiptMock.mockReset()
+    updateReceiptMock.mockReset()
+    createDraftItemsMock.mockReset()
+    extractReceiptDraftItemsMock.mockReset()
   })
 
   it("returns 400 when no file is uploaded", async () => {
@@ -104,8 +128,15 @@ describe("POST /api/receipts route", () => {
     uploadMock.mockResolvedValue({ error: null })
     createReceiptMock.mockResolvedValue({
       id: "receipt-123",
-      ocrStatus: "PENDING",
     })
+    extractReceiptDraftItemsMock.mockResolvedValue({
+      items: [
+        { name: "Milk", quantity: 2, confidence: 0.88 },
+      ],
+      fallbackUsed: false,
+    })
+    updateReceiptMock.mockResolvedValue({ id: "receipt-123", ocrStatus: "SUCCESS" })
+    createDraftItemsMock.mockResolvedValue({ count: 1 })
 
     const formData = new FormData()
     formData.append(
@@ -123,9 +154,70 @@ describe("POST /api/receipts route", () => {
     expect(response.status).toBe(201)
     const body = await response.json()
     expect(body.receiptId).toBe("receipt-123")
-    expect(body.ocrStatus).toBe("PENDING")
+    expect(body.ocrStatus).toBe("SUCCESS")
     expect(uploadMock).toHaveBeenCalledTimes(1)
     expect(createReceiptMock).toHaveBeenCalledTimes(1)
+    expect(createDraftItemsMock).toHaveBeenCalledTimes(1)
+    expect(updateReceiptMock).toHaveBeenCalledWith({
+      where: { id: "receipt-123" },
+      data: { ocrStatus: "SUCCESS" },
+    })
+  })
+
+  it("sets FALLBACK_USED when fallback parser extracts items", async () => {
+    uploadMock.mockResolvedValue({ error: null })
+    createReceiptMock.mockResolvedValue({ id: "receipt-123" })
+    extractReceiptDraftItemsMock.mockResolvedValue({
+      items: [{ name: "Bread", quantity: 1, confidence: null }],
+      fallbackUsed: true,
+    })
+    createDraftItemsMock.mockResolvedValue({ count: 1 })
+    updateReceiptMock.mockResolvedValue({ id: "receipt-123", ocrStatus: "FALLBACK_USED" })
+
+    const formData = new FormData()
+    formData.append(
+      "receipt",
+      new File(["data"], "receipt.jpg", { type: "image/jpeg" })
+    )
+
+    const request = new Request("http://localhost/api/receipts", {
+      method: "POST",
+      body: formData as any,
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(201)
+    const body = await response.json()
+    expect(body.ocrStatus).toBe("FALLBACK_USED")
+  })
+
+  it("sets FAILED when OCR returns no items", async () => {
+    uploadMock.mockResolvedValue({ error: null })
+    createReceiptMock.mockResolvedValue({ id: "receipt-123" })
+    extractReceiptDraftItemsMock.mockResolvedValue({
+      items: [],
+      fallbackUsed: false,
+    })
+    updateReceiptMock.mockResolvedValue({ id: "receipt-123", ocrStatus: "FAILED" })
+
+    const formData = new FormData()
+    formData.append(
+      "receipt",
+      new File(["data"], "receipt.jpg", { type: "image/jpeg" })
+    )
+
+    const request = new Request("http://localhost/api/receipts", {
+      method: "POST",
+      body: formData as any,
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(201)
+    const body = await response.json()
+    expect(body.ocrStatus).toBe("FAILED")
+    expect(createDraftItemsMock).not.toHaveBeenCalled()
   })
 
   it("handles storage upload failure", async () => {
