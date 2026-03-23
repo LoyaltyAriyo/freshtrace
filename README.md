@@ -5,33 +5,39 @@
 - `client/` – Next.js frontend application (app router, components, types).
 - `server/` – Backend code and Prisma (`server/prisma`).
 
-## Getting Started
+Test Bed Setup (How to Run the Project)
 
-You can run the app either from the root or from the `client` folder:
-- Install the dependencies
-  ```bash
-  cd client
-  npm install
-  ```
-- From the root (recommended for most users):
+Follow these steps to run the Fresh Trace application locally.
 
-  ```bash
-  npm run dev
-  ```
+1. Clone the repository
+git clone https://github.com/T5-W26-COMP231/T5-W26-COMP231.git
+cd T5-W26-COMP231
+2. Install dependencies
+cd client
+npm install
+3. Set up the database (Prisma)
 
-- Or directly from the client app:
+Make sure you are inside the client folder.
 
-  ```bash
-  cd client
-  npm run dev
-  # or
-  yarn dev
-  # or
-  pnpm dev
-  # or
-  bun dev
-  ```
+npx prisma generate
+npx prisma migrate dev
+npx prisma db seed
 
+This will:
+
+generate the Prisma client
+create the SQLite database
+seed default categories (Produce, Dairy, Meat, etc.)
+4. Run the application
+
+From the root (recommended):
+
+npm run dev
+
+Or from the client folder:
+
+cd client
+npm run dev
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the main page by modifying `client/app/page.tsx`. The page auto-updates as you edit the file.
@@ -41,7 +47,7 @@ You can start editing the main page by modifying `client/app/page.tsx`. The page
 Fresh Trace is a food tracking and waste reduction application developed for COMP231 using Agile Scrum.
 
 ## Team Members
-- Sinikiem Azaiki
+- Sinikiem
 - Burak
 - Rexy
 - Amir
