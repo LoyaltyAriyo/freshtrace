@@ -106,7 +106,9 @@ describe("ReviewPage", () => {
 
     expect(
       await screen.findByTestId("ocr-pending"),
-    ).toHaveTextContent(/still processing your receipt/i)
+    ).toHaveTextContent(
+      /couldn'?t extract any items from this receipt yet/i,
+    )
 
     const confirmButton = screen.getByRole("button", { name: /confirm items/i })
     expect(confirmButton).toBeDisabled()

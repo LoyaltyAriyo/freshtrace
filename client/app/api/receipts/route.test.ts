@@ -78,7 +78,7 @@ describe("POST /api/receipts route", () => {
 
     const request = new Request("http://localhost/api/receipts", {
       method: "POST",
-      body: formData as any,
+      body: formData as FormData,
     })
 
     const response = await POST(request)
@@ -97,7 +97,7 @@ describe("POST /api/receipts route", () => {
 
     const request = new Request("http://localhost/api/receipts", {
       method: "POST",
-      body: formData as any,
+      body: formData as FormData,
     })
 
     const response = await POST(request)
@@ -118,7 +118,7 @@ describe("POST /api/receipts route", () => {
 
     const request = new Request("http://localhost/api/receipts", {
       method: "POST",
-      body: formData as any,
+      body: formData as FormData,
     })
 
     const response = await POST(request)
@@ -154,7 +154,7 @@ describe("POST /api/receipts route", () => {
 
     const request = new Request("http://localhost/api/receipts", {
       method: "POST",
-      body: formData as any,
+      body: formData as FormData,
     })
 
     const response = await POST(request)
@@ -195,7 +195,7 @@ describe("POST /api/receipts route", () => {
 
     const request = new Request("http://localhost/api/receipts", {
       method: "POST",
-      body: formData as any,
+      body: formData as FormData,
     })
 
     const response = await POST(request)
@@ -226,7 +226,7 @@ describe("POST /api/receipts route", () => {
 
     const request = new Request("http://localhost/api/receipts", {
       method: "POST",
-      body: formData as any,
+      body: formData as FormData,
     })
 
     const response = await POST(request)
@@ -251,7 +251,7 @@ describe("POST /api/receipts route", () => {
 
     const request = new Request("http://localhost/api/receipts", {
       method: "POST",
-      body: formData as any,
+      body: formData as FormData,
     })
 
     const response = await POST(request)
@@ -273,7 +273,7 @@ describe("POST /api/receipts route", () => {
 
     const request = new Request("http://localhost/api/receipts", {
       method: "POST",
-      body: formData as any,
+      body: formData as FormData,
     })
 
     const response = await POST(request)
@@ -297,7 +297,7 @@ describe("POST /api/receipts route", () => {
 
     const request = new Request("http://localhost/api/receipts", {
       method: "POST",
-      body: formData as any,
+      body: formData as FormData,
     })
 
     const response = await POST(request)

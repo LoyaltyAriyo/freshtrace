@@ -1,6 +1,8 @@
+export const runtime = "nodejs"
 import { prisma } from "@/lib/prisma"
 import { extractReceiptDraftItems } from "@/lib/ocr"
 import { supabaseAdmin } from "@/lib/supabase/server"
+
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 const RECEIPTS_BUCKET = "receipts"
