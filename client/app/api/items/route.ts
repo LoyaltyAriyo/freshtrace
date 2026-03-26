@@ -1,6 +1,16 @@
 import { prisma } from "@/lib/prisma"
 
 type ItemPriority = "use-first" | "use-soon" | "use-later"
+type FoodListQueryItem = {
+  id: string
+  name: string
+  quantity: number
+  dateAdded: Date
+  status: string
+  category: {
+    name: string
+  }
+}
 
 function toPriority(dateAdded: Date): ItemPriority {
   const ageInDays =
@@ -34,7 +44,7 @@ export async function GET() {
       },
     })
 
-    const payload = items.map((item) => ({
+    const payload = (items as FoodListQueryItem[]).map((item) => ({
       id: item.id,
       name: item.name,
       quantity: item.quantity,
