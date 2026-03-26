@@ -62,4 +62,4 @@ export function RecentAlerts({ alerts }: { alerts: Alert[] }) {
       </CardContent>
     </Card>
   )
-}
+} 
