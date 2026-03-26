@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
@@ -21,7 +21,7 @@ const priorityStyles: Record<string, string> = {
   "use-later": "bg-green-100 text-green-800",
 }
 
-export default function FoodListPage() {
+function FoodListPageContent() {
   const searchParams = useSearchParams()
   const [items, setItems] = useState<FoodListItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -231,5 +231,13 @@ export default function FoodListPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function FoodListPage() {
+  return (
+    <Suspense fallback={null}>
+      <FoodListPageContent />
+    </Suspense>
   )
 }

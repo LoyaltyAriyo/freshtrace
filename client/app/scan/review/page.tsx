@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -292,7 +292,7 @@ async function saveReviewedItems(
   return { error: { type: "server", message }, savedCount: 0 }
 }
 
-export default function ReviewPage() {
+function ReviewPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const receiptId = searchParams.get("receiptId")
@@ -838,5 +838,13 @@ export default function ReviewPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function ReviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <ReviewPageContent />
+    </Suspense>
   )
 }
