@@ -93,24 +93,26 @@ export async function extractReceiptDraftItems(imageBytes: Uint8Array): Promise<
 
 	try {
 		const tesseract = await import("tesseract.js")
-
-		// Build an absolute filesystem path to the Node worker script based on
-		// the real working directory, instead of relying on the app-route
-		// runtime's module resolution (which was producing a non-file string).
-		const workerPath = path.join(
-			process.cwd(),
-			"node_modules",
-			"tesseract.js",
-			"src",
-			"worker-script",
-			"node",
-			"index.js",
-		)
 		// Tesseract typings expect an ImageLike (e.g. Buffer), so wrap the
 		// Uint8Array from storage in a Node Buffer for type safety.
 		const input = Buffer.from(imageBytes)
-		const recognizeOptions: Partial<Record<string, unknown>> = { workerPath }
-		const result = await tesseract.recognize(input, "eng", recognizeOptions)
+		const workerOptions =
+			process.env.VERCEL || process.env.NODE_ENV === "production"
+				? {}
+				: {
+						workerPath: path.join(
+							process.cwd(),
+							"node_modules",
+							"tesseract.js",
+							"src",
+							"worker-script",
+							"node",
+							"index.js",
+						),
+					}
+		const worker = await tesseract.createWorker("eng", 1, workerOptions)
+		const result = await worker.recognize(input)
+		await worker.terminate()
 
 		const text = result?.data?.text ?? ""
 		const confidenceRaw = result?.data?.confidence
