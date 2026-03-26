@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { PrismaClientKnownRequestError } from "@prisma/client"
 
 type RouteContext = {
   params: Promise<{ id: string }>
+}
+
+function isNotFoundPrismaError(
+  error: unknown,
+): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+  )
 }
 
 export async function GET(_: Request, context: RouteContext) {
@@ -92,7 +102,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json(updated)
   } catch (error) {
-    if (error instanceof PrismaClientKnownRequestError && error.code === "P2025") {
+    if (isNotFoundPrismaError(error) && error.code === "P2025") {
       return NextResponse.json({ error: "Item not found." }, { status: 404 })
     }
 
