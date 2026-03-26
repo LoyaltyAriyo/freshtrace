@@ -10,7 +10,9 @@ async function main() {
       update: { shelfLifeDays: category.shelfLifeDays },
       create: category,
     })
+    console.log(`Seeded category: ${category.name}`)
   }
+  console.log(`Done — seeded ${DEFAULT_CATEGORIES.length} categories.`)
 }
 
 main()
