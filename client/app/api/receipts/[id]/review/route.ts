@@ -9,6 +9,14 @@ type EditedItemInput = {
   categoryId: string
 }
 
+type ReceiptDraftItem = {
+  id: string
+  name: string
+  quantity: number
+  categoryId: string | null
+  isSelected: boolean
+}
+
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params
 
@@ -152,7 +160,7 @@ export async function POST(request: Request, { params }: Params) {
     return Response.json({ error: "Receipt not found." }, { status: 404 })
   }
 
-  const selectedDrafts = receipt.draftItems.filter((item) =>
+  const selectedDrafts = (receipt.draftItems as ReceiptDraftItem[]).filter((item) =>
     selectedItemIds.includes(item.id)
   )
 
