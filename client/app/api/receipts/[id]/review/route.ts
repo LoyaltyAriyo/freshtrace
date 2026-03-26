@@ -17,6 +17,15 @@ type ReceiptDraftItem = {
   isSelected: boolean
 }
 
+type ReviewCategory = {
+  id: string
+  name: string
+}
+
+type ReviewCategoryId = {
+  id: string
+}
+
 export async function GET(_request: Request, { params }: Params) {
   const { id } = await params
 
@@ -47,7 +56,7 @@ export async function GET(_request: Request, { params }: Params) {
 
   return Response.json({
     ...receipt,
-    categories: categories.map((category) => ({
+    categories: (categories as ReviewCategory[]).map((category) => ({
       id: category.id,
       name: category.name,
     })),
@@ -217,7 +226,9 @@ export async function POST(request: Request, { params }: Params) {
     },
   })
 
-  const validCategoryIds = new Set(categories.map((category) => category.id))
+  const validCategoryIds = new Set(
+    (categories as ReviewCategoryId[]).map((category) => category.id)
+  )
   const unknownCategory = selectedWithEdits.find(
     (item) => !item.categoryId || !validCategoryIds.has(item.categoryId)
   )

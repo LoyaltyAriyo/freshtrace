@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "prisma:generate": "prisma generate --schema ../server/prisma/schema.prisma",
+    "prisma:push": "prisma db push --schema ../server/prisma/schema.prisma",
+    "postinstall": "npm run prisma:generate",
     "test": "vitest",
     "test:watch": "vitest --watch"
   },

@@ -1,13 +1,10 @@
 import { PrismaClient } from "@prisma/client"
-import path from "path"
 
-const localDbUrl = `file:${path
-  .resolve(process.cwd(), "../server/prisma/dev.db")
-  .replace(/\\/g, "/")}`
+const dbUrl = process.env.DATABASE_URL
 
-const dbUrl = process.env.NODE_ENV === "production"
-  ? process.env.DATABASE_URL || localDbUrl
-  : localDbUrl
+if (!dbUrl) {
+  throw new Error("DATABASE_URL environment variable is not set")
+}
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
