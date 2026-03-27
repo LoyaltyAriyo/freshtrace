@@ -242,21 +242,16 @@ export async function ensureCategories(categoryModel: CategoryModel) {
     orderBy: { name: "asc" },
   }
 
-  try {
-    const existing = await categoryModel.findMany(query)
-    if ((existing?.length ?? 0) > 0 || !categoryModel.createMany) {
-      return existing ?? []
-    }
-
-    await categoryModel.createMany({
-      data: DEFAULT_CATEGORIES,
-    })
-
-    return (await categoryModel.findMany(query)) ?? []
-  } catch (error) {
-    console.error("Failed to ensure categories:", error)
-    return []
+  const existing = await categoryModel.findMany(query)
+  if ((existing?.length ?? 0) > 0 || !categoryModel.createMany) {
+    return existing ?? []
   }
+
+  await categoryModel.createMany({
+    data: DEFAULT_CATEGORIES,
+  })
+
+  return (await categoryModel.findMany(query)) ?? []
 }
 
 function matchesWordBoundary(text: string, keyword: string): boolean {

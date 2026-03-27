@@ -180,6 +180,17 @@ describe("POST /api/receipts/[id]/review", () => {
     expect(body.error).toMatch(/at least one item/i)
   })
 
+  it("returns 400 when selectedItemIds contains non-string values", async () => {
+    const response = await POST(
+      makeRequest("POST", { selectedItemIds: [123, "draft-1"] }),
+      makeParams()
+    )
+
+    expect(response.status).toBe(400)
+    const body = await response.json()
+    expect(body.error).toMatch(/array of strings/i)
+  })
+
   it("returns 404 when receipt does not exist", async () => {
     findUniqueMock.mockResolvedValue(null)
 

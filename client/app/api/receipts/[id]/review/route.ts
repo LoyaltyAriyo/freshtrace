@@ -82,6 +82,13 @@ export async function POST(request: Request, { params }: Params) {
     )
   }
 
+  if (!selectedItemIds.every((id) => typeof id === "string")) {
+    return Response.json(
+      { error: "selectedItemIds must be an array of strings." },
+      { status: 400 }
+    )
+  }
+
   if (selectedItemIds.length === 0) {
     return Response.json(
       { error: "Please select at least one item to save." },
