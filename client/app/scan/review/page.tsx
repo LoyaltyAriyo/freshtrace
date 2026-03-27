@@ -764,13 +764,29 @@ function ReviewPageContent() {
                   <span>
                     {selectedCount} of {totalItems} items selected
                   </span>
-                  {itemsNeedingReview > 0 && (
-                    <span>
-                      {itemsNeedingReview}{" "}
-                      {itemsNeedingReview === 1 ? "item needs" : "items need"}{" "}
-                      review
-                    </span>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {itemsNeedingReview > 0 && (
+                      <span>
+                        {itemsNeedingReview}{" "}
+                        {itemsNeedingReview === 1 ? "item needs" : "items need"}{" "}
+                        review
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="text-xs text-primary underline underline-offset-2 hover:text-primary/80 disabled:opacity-50"
+                      disabled={saving}
+                      onClick={() => {
+                        if (selectedCount === totalItems) {
+                          setSelectedItemIds(new Set())
+                        } else {
+                          setSelectedItemIds(new Set(receipt.draftItems.map((item) => item.id)))
+                        }
+                      }}
+                    >
+                      {selectedCount === totalItems ? "Deselect all" : "Select all"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
