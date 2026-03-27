@@ -208,16 +208,16 @@ function FoodListPageContent() {
               <button
                 onClick={() => markUsed(item.id)}
                 disabled={updatingItemId === item.id}
-                className="rounded-md border px-3 py-1 text-xs hover:bg-muted"
+                className="rounded-md border px-3 py-1 text-xs hover:bg-muted flex items-center gap-1"
               >
-                {updatingItemId === item.id ? "Updating..." : "Used"}
+                ✓ {updatingItemId === item.id ? "Updating..." : "Mark as Used"}
               </button>
               <button
                 onClick={() => markWasted(item.id)}
                 disabled={updatingItemId === item.id}
-                className="rounded-md border border-red-200 px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+                className="rounded-md border border-red-200 px-3 py-1 text-xs text-red-700 hover:bg-red-50 flex items-center gap-1"
               >
-                {updatingItemId === item.id ? "Updating..." : "Wasted"}
+                ✕ {updatingItemId === item.id ? "Updating..." : "Mark as Wasted"}
               </button>
             </div>
           </div>
