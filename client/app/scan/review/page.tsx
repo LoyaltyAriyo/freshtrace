@@ -25,6 +25,13 @@ type DraftItem = {
   isSelected?: boolean | null
 }
 
+type EditedItemPayload = {
+  id: string
+  name: string
+  quantity: number
+  categoryId: string
+}
+
 type ReceiptReviewResponse = {
   id: string
   ocrStatus: string
@@ -254,12 +261,7 @@ function hasBlockingIssues(issues: ItemIssue[]): boolean {
 async function saveReviewedItems(
   receiptId: string,
   selectedItemIds: string[],
-  editedItems: Array<{
-    id: string
-    name: string
-    quantity: number
-    categoryId: string
-  }>,
+  editedItems: EditedItemPayload[],
 ): Promise<{ error: SaveError | null; savedCount: number }> {
   let response: Response
 
@@ -457,6 +459,21 @@ function ReviewPageContent() {
     [categories],
   )
 
+  function updateDraftItem(
+    id: string,
+    updater: (item: DraftItem) => DraftItem,
+  ) {
+    setReceipt((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        draftItems: prev.draftItems.map((item) =>
+          item.id === id ? updater(item) : item,
+        ),
+      }
+    })
+  }
+
   function toggleItemSelection(id: string, checked: boolean) {
     setSelectedItemIds((prev) => {
       const next = new Set(prev)
@@ -470,42 +487,19 @@ function ReviewPageContent() {
   }
 
   function updateItemName(id: string, value: string) {
-    setReceipt((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        draftItems: prev.draftItems.map((item) =>
-          item.id === id ? { ...item, name: value } : item
-        ),
-      }
-    })
+    updateDraftItem(id, (item) => ({ ...item, name: value }))
   }
 
   function updateItemQuantity(id: string, value: string) {
     const parsed = Number(value)
     const quantity = Number.isFinite(parsed) ? parsed : 0
 
-    setReceipt((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        draftItems: prev.draftItems.map((item) =>
-          item.id === id ? { ...item, quantity } : item
-        ),
-      }
-    })
+    updateDraftItem(id, (item) => ({ ...item, quantity }))
   }
 
   function updateItemCategory(id: string, value: string) {
-    setReceipt((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        draftItems: prev.draftItems.map((item) =>
-          item.id === id ? { ...item, categoryId: value.trim() || null } : item
-        ),
-      }
-    })
+    const nextCategoryId = value.trim() || null
+    updateDraftItem(id, (item) => ({ ...item, categoryId: nextCategoryId }))
   }
 
   async function handleConfirm() {
@@ -552,7 +546,7 @@ function ReviewPageContent() {
     setSaving(true)
     setSaveError(null)
 
-    const selectedEditedItems = receipt.draftItems
+    const selectedEditedItems: EditedItemPayload[] = receipt.draftItems
       .filter((item) => selectedItemIds.has(item.id))
       .map((item) => ({
         id: item.id,

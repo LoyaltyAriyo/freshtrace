@@ -296,6 +296,80 @@ describe("ReviewPage", () => {
     })
   })
 
+  it("sends edited item fields in the save request", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({
+          id: "receipt-123",
+          ocrStatus: "SUCCESS",
+          imagePath: "uploads/receipt.jpg",
+          draftItems: [
+            {
+              id: "draft-1",
+              name: "Milk",
+              quantity: 1,
+              categoryId: "cat-dairy",
+              confidence: 0.9,
+              isSelected: true,
+            },
+          ],
+          categories: [
+            { id: "cat-dairy", name: "Dairy" },
+            { id: "cat-bakery", name: "Bakery" },
+          ],
+        }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: vi.fn().mockResolvedValue({ savedCount: 1 }),
+      } as unknown as Response)
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<ReviewPage />)
+
+    await screen.findByDisplayValue("Milk")
+
+    fireEvent.change(screen.getByLabelText(/edit name/i), {
+      target: { value: "Updated Milk" },
+    })
+
+    fireEvent.change(screen.getByLabelText(/edit quantity/i), {
+      target: { value: "3" },
+    })
+
+    fireEvent.change(screen.getByLabelText(/edit category/i), {
+      target: { value: "cat-bakery" },
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /confirm items/i }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    const postCall = fetchMock.mock.calls[1]
+    expect(postCall[0]).toBe("/api/receipts/receipt-123/review")
+
+    const postBody = JSON.parse(postCall[1].body as string)
+
+    expect(postBody.selectedItemIds).toEqual(["draft-1"])
+    expect(postBody.editedItems).toEqual([
+      {
+        id: "draft-1",
+        name: "Updated Milk",
+        quantity: 3,
+        categoryId: "cat-bakery",
+      },
+    ])
+  })
+
   it("shows validation error when edited quantity is invalid", async () => {
     getSearchParamMock.mockReturnValue("receipt-123")
 
