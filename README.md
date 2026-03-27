@@ -57,6 +57,23 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the main page by modifying `client/app/page.tsx`. The page auto-updates as you edit the file.
 
+## Prisma / PostgreSQL migration note
+
+If you previously ran this project when it was using SQLite, you might see a Prisma error mentioning `file:` URLs or a validation error when calling `/api/items/prioritized`. This usually means an old Prisma client (compiled for SQLite) is still present in `node_modules`.
+
+To fix this after pulling the latest changes (while inside the `client` folder), run these commands in order:
+
+```powershell
+Remove-Item -Recurse -Force .\node_modules\.prisma
+Remove-Item -Recurse -Force .\.next
+npm run prisma:generate
+npm run prisma:push
+npm run prisma:seed
+npm run dev
+```
+
+This clears the old Prisma client and Next.js build artifacts, then regenerates the Prisma client and syncs the PostgreSQL schema and seed data before starting the dev server.
+
 # Fresh Trace
 
 Fresh Trace is a food tracking and waste reduction application developed for COMP231 using Agile Scrum.
