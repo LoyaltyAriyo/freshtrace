@@ -72,6 +72,16 @@ describe("ManualEntryForm", () => {
     expect(await screen.findByText(/please select a category/i)).toBeInTheDocument()
   })
 
+  it("shows an error when quantity is not a whole number", async () => {
+    render(<ManualEntryForm />)
+    fillForm({ quantity: "1.5" })
+
+    fireEvent.click(screen.getByRole("button", { name: /save item/i }))
+
+    expect(await screen.findByText(/whole number of at least 1/i)).toBeInTheDocument()
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled()
+  })
+
   it("submits the form and redirects to /food-list on success", async () => {
     vi.stubGlobal(
       "fetch",

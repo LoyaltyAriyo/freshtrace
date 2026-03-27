@@ -26,6 +26,11 @@ export function ManualEntryForm() {
       setError("Item name is required.")
       return
     }
+    const parsedQuantity = Number(quantity)
+    if (!Number.isFinite(parsedQuantity) || !Number.isInteger(parsedQuantity) || parsedQuantity < 1) {
+      setError("Quantity must be a whole number of at least 1.")
+      return
+    }
     if (!categoryId) {
       setError("Please select a category.")
       return

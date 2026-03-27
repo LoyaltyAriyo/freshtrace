@@ -119,6 +119,14 @@ describe("POST /api/items", () => {
     expect(body.error).toMatch(/quantity/i)
   })
 
+  it("returns 400 when quantity is a decimal", async () => {
+    const response = await POST(makeRequest({ name: "Milk", quantity: 1.5, categoryId: "cat-1" }))
+
+    expect(response.status).toBe(400)
+    const body = await response.json()
+    expect(body.error).toMatch(/whole number of at least 1/i)
+  })
+
   it("returns 400 when categoryId is missing", async () => {
     const response = await POST(makeRequest({ name: "Milk", quantity: 1 }))
 
