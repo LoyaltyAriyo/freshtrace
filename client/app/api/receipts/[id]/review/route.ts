@@ -9,6 +9,12 @@ type EditedItemInput = {
   categoryId: string
 }
 
+type AddedItemInput = {
+  name: string
+  quantity: number
+  categoryId: string
+}
+
 type ReceiptDraftItem = {
   id: string
   name: string
@@ -73,7 +79,7 @@ export async function POST(request: Request, { params }: Params) {
     return Response.json({ error: "Invalid JSON body." }, { status: 400 })
   }
 
-  const { selectedItemIds, editedItems } = body as Record<string, unknown>
+  const { selectedItemIds, editedItems, addedItems } = body as Record<string, unknown>
 
   if (!Array.isArray(selectedItemIds)) {
     return Response.json(
@@ -156,6 +162,60 @@ export async function POST(request: Request, { params }: Params) {
     }
   }
 
+  if (addedItems !== undefined && !Array.isArray(addedItems)) {
+    return Response.json(
+      { error: "addedItems must be an array when provided." },
+      { status: 400 }
+    )
+  }
+
+  const addedItemsList: AddedItemInput[] = []
+  if (Array.isArray(addedItems)) {
+    for (const rawItem of addedItems) {
+      if (!rawItem || typeof rawItem !== "object") {
+        return Response.json(
+          { error: "Each added item must be an object." },
+          { status: 400 }
+        )
+      }
+
+      const item = rawItem as Record<string, unknown>
+      const name = typeof item.name === "string" ? item.name.trim() : ""
+      const quantity = Number(item.quantity)
+      const categoryId =
+        typeof item.categoryId === "string" ? item.categoryId.trim() : ""
+
+      if (!name) {
+        return Response.json(
+          { error: "Added items must have a non-empty name." },
+          { status: 400 }
+        )
+      }
+
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        return Response.json(
+          { error: `Item "${name}" has an invalid quantity.` },
+          { status: 400 }
+        )
+      }
+
+      if (!categoryId) {
+        return Response.json(
+          {
+            error: `Item "${name}" is missing a category.`,
+          },
+          { status: 422 }
+        )
+      }
+
+      addedItemsList.push({
+        name,
+        quantity,
+        categoryId,
+      })
+    }
+  }
+
   const receipt = await prisma.receipt.findUnique({
     where: { id },
     select: {
@@ -190,7 +250,9 @@ export async function POST(request: Request, { params }: Params) {
     }
   })
 
-  const invalidName = selectedWithEdits.find((item) => !item.name)
+  const itemsToSave = [...selectedWithEdits, ...addedItemsList]
+
+  const invalidName = itemsToSave.find((item) => !item.name)
   if (invalidName) {
     return Response.json(
       { error: "Selected items must have a valid name." },
@@ -198,7 +260,7 @@ export async function POST(request: Request, { params }: Params) {
     )
   }
 
-  const invalidQuantity = selectedWithEdits.find(
+  const invalidQuantity = itemsToSave.find(
     (item) => !Number.isInteger(item.quantity) || item.quantity < 1
   )
   if (invalidQuantity) {
@@ -208,7 +270,7 @@ export async function POST(request: Request, { params }: Params) {
     )
   }
 
-  const missingCategory = selectedWithEdits.find((item) => !item.categoryId)
+  const missingCategory = itemsToSave.find((item) => !item.categoryId)
   if (missingCategory) {
     return Response.json(
       {
@@ -219,7 +281,7 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const selectedCategoryIds = Array.from(
-    new Set(selectedWithEdits.map((item) => item.categoryId).filter((value): value is string => !!value))
+    new Set(itemsToSave.map((item) => item.categoryId).filter((value): value is string => !!value))
   )
 
   const categories = await prisma.category.findMany({
@@ -236,7 +298,7 @@ export async function POST(request: Request, { params }: Params) {
   const validCategoryIds = new Set(
     (categories as ReviewCategoryId[]).map((category) => category.id)
   )
-  const unknownCategory = selectedWithEdits.find(
+  const unknownCategory = itemsToSave.find(
     (item) => !item.categoryId || !validCategoryIds.has(item.categoryId)
   )
 
@@ -249,7 +311,7 @@ export async function POST(request: Request, { params }: Params) {
 
   try {
     const result = await prisma.foodItem.createMany({
-      data: selectedWithEdits.map((item) => ({
+      data: itemsToSave.map((item) => ({
         name: item.name,
         quantity: item.quantity,
         categoryId: item.categoryId as string,

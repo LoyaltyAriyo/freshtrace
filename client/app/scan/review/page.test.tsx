@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 
 import ReviewPage from "./page"
 
@@ -21,6 +21,10 @@ describe("ReviewPage", () => {
   beforeEach(() => {
     pushMock.mockReset()
     getSearchParamMock.mockReset()
+    // Required by Radix UI Select used in AddDraftItemForm
+    window.HTMLElement.prototype.scrollIntoView = vi.fn()
+    window.HTMLElement.prototype.hasPointerCapture = vi.fn()
+    window.HTMLElement.prototype.releasePointerCapture = vi.fn()
   })
 
   afterEach(() => {
@@ -408,5 +412,158 @@ describe("ReviewPage", () => {
     const errorAlert = await screen.findByTestId("save-error")
     expect(errorAlert).toHaveTextContent(/some selected items still need review/i)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("allows removing a draft item from the review list and excludes it from the save payload", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({
+          id: "receipt-123",
+          ocrStatus: "SUCCESS",
+          imagePath: "uploads/receipt.jpg",
+          draftItems: [
+            {
+              id: "draft-1",
+              name: "Milk",
+              quantity: 2,
+              categoryId: "cat-dairy",
+              confidence: 0.9,
+              isSelected: true,
+            },
+            {
+              id: "draft-2",
+              name: "Bread",
+              quantity: 1,
+              categoryId: "cat-bakery",
+              confidence: 0.8,
+              isSelected: true,
+            },
+          ],
+          categories: [
+            { id: "cat-dairy", name: "Dairy" },
+            { id: "cat-bakery", name: "Bakery" },
+          ],
+        }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: vi.fn().mockResolvedValue({ savedCount: 1 }),
+      } as unknown as Response)
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<ReviewPage />)
+
+    await screen.findByText("Milk")
+    await screen.findByText("Bread")
+
+    fireEvent.click(screen.getByRole("button", { name: /remove bread/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByText("Bread")).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /confirm items/i }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    const postCall = fetchMock.mock.calls[1]
+    const postBody = JSON.parse(postCall[1].body as string)
+
+    expect(postBody.selectedItemIds).toEqual(["draft-1"])
+    expect(postBody.addedItems).toEqual([])
+  })
+
+  it("allows adding a new item and includes it in the save payload", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({
+          id: "receipt-123",
+          ocrStatus: "SUCCESS",
+          imagePath: "uploads/receipt.jpg",
+          draftItems: [
+            {
+              id: "draft-1",
+              name: "Milk",
+              quantity: 1,
+              categoryId: "cat-dairy",
+              confidence: 0.9,
+              isSelected: true,
+            },
+          ],
+          categories: [
+            { id: "cat-dairy", name: "Dairy" },
+            { id: "cat-bakery", name: "Bakery" },
+          ],
+        }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: vi.fn().mockResolvedValue({ savedCount: 2 }),
+      } as unknown as Response)
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<ReviewPage />)
+
+    await screen.findByText("Milk")
+
+    const addForm = await screen.findByRole("form", { name: /add item form/i })
+
+    fireEvent.change(
+      within(addForm).getByLabelText("Item Name"),
+      { target: { value: "Bread" } },
+    )
+    fireEvent.change(
+      within(addForm).getByLabelText("Qty"),
+      { target: { value: "2" } },
+    )
+
+    const categoryTrigger = within(addForm).getByRole("combobox")
+    fireEvent.pointerDown(categoryTrigger, { button: 0, ctrlKey: false })
+    fireEvent.click(categoryTrigger)
+    fireEvent.click(
+      await screen.findByRole("option", { name: "Bakery" }),
+    )
+
+    fireEvent.click(
+      within(addForm).getByRole("button", { name: /add item/i }),
+    )
+
+    await screen.findByText("Bread")
+
+    fireEvent.click(screen.getByRole("button", { name: /confirm items/i }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    })
+
+    const postCall = fetchMock.mock.calls[1]
+    const postBody = JSON.parse(postCall[1].body as string)
+
+    expect(postBody.selectedItemIds).toEqual(
+      expect.arrayContaining(["draft-1"]),
+    )
+    expect(postBody.addedItems).toEqual([
+      {
+        name: "Bread",
+        quantity: 2,
+        categoryId: "cat-bakery",
+      },
+    ])
   })
 })

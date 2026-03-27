@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 
+import { AddDraftItemForm } from "@/components/add-draft-item-form"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,10 +24,17 @@ type DraftItem = {
   categoryId: string | null
   confidence?: number | null
   isSelected?: boolean | null
+   isNew?: boolean | null
 }
 
 type EditedItemPayload = {
   id: string
+  name: string
+  quantity: number
+  categoryId: string
+}
+
+type AddedItemPayload = {
   name: string
   quantity: number
   categoryId: string
@@ -262,6 +270,7 @@ async function saveReviewedItems(
   receiptId: string,
   selectedItemIds: string[],
   editedItems: EditedItemPayload[],
+  addedItems: AddedItemPayload[],
 ): Promise<{ error: SaveError | null; savedCount: number }> {
   let response: Response
 
@@ -269,7 +278,7 @@ async function saveReviewedItems(
     response = await fetch(`/api/receipts/${receiptId}/review`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ selectedItemIds, editedItems }),
+      body: JSON.stringify({ selectedItemIds, editedItems, addedItems }),
     })
   } catch {
     return { error: { type: "network" }, savedCount: 0 }
@@ -502,6 +511,53 @@ function ReviewPageContent() {
     updateDraftItem(id, (item) => ({ ...item, categoryId: nextCategoryId }))
   }
 
+  function removeDraftItem(id: string) {
+    setReceipt((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        draftItems: prev.draftItems.filter((item) => item.id !== id),
+      }
+    })
+
+    setSelectedItemIds((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }
+
+  function handleAddDraftItem(input: { name: string; quantity: number; categoryId: string }) {
+    if (!receipt) return
+
+    const id = `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+    const newItem: DraftItem = {
+      id,
+      name: input.name,
+      quantity: input.quantity,
+      categoryId: input.categoryId,
+      confidence: null,
+      isSelected: true,
+      isNew: true,
+    }
+
+    setReceipt((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        draftItems: [...prev.draftItems, newItem],
+      }
+    })
+
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }
+
   async function handleConfirm() {
     if (!receiptId) {
       setSaveError({ type: "missing_receipt" })
@@ -516,11 +572,11 @@ function ReviewPageContent() {
       return
     }
 
-    const selectedIds = receipt.draftItems
-      .filter((item) => selectedItemIds.has(item.id))
-      .map((item) => item.id)
+    const selectedDraftItems = receipt.draftItems.filter((item) =>
+      selectedItemIds.has(item.id),
+    )
 
-    if (selectedIds.length === 0) {
+    if (selectedDraftItems.length === 0) {
       setSaveError({
         type: "validation",
         message: "Please select at least one item to save.",
@@ -528,8 +584,7 @@ function ReviewPageContent() {
       return
     }
 
-    const itemsWithBlockingIssues = receipt.draftItems.filter((item) => {
-      if (!selectedItemIds.has(item.id)) return false
+    const itemsWithBlockingIssues = selectedDraftItems.filter((item) => {
       const issues = getItemIssues(item)
       return hasBlockingIssues(issues)
     })
@@ -543,12 +598,20 @@ function ReviewPageContent() {
       return
     }
 
+    const selectedExistingItems = selectedDraftItems.filter(
+      (item) => !item.isNew,
+    )
+    const selectedNewItems = selectedDraftItems.filter(
+      (item) => item.isNew,
+    )
+
+    const selectedIds = selectedExistingItems.map((item) => item.id)
+
     setSaving(true)
     setSaveError(null)
 
-    const selectedEditedItems: EditedItemPayload[] = receipt.draftItems
-      .filter((item) => selectedItemIds.has(item.id))
-      .map((item) => ({
+    const selectedEditedItems: EditedItemPayload[] = selectedExistingItems.map(
+      (item) => ({
         id: item.id,
         name: (item.name ?? "").trim(),
         quantity:
@@ -556,9 +619,24 @@ function ReviewPageContent() {
             ? Math.max(0, Math.floor(item.quantity))
             : 0,
         categoryId: (item.categoryId ?? "").trim(),
-      }))
+      }),
+    )
 
-    const result = await saveReviewedItems(receiptId, selectedIds, selectedEditedItems)
+    const addedItems: AddedItemPayload[] = selectedNewItems.map((item) => ({
+      name: (item.name ?? "").trim(),
+      quantity:
+        typeof item.quantity === "number" && Number.isFinite(item.quantity)
+          ? Math.max(0, Math.floor(item.quantity))
+          : 0,
+      categoryId: (item.categoryId ?? "").trim(),
+    }))
+
+    const result = await saveReviewedItems(
+      receiptId,
+      selectedIds,
+      selectedEditedItems,
+      addedItems,
+    )
 
     if (result.error) {
       setSaveError(result.error)
@@ -807,10 +885,33 @@ function ReviewPageContent() {
                             )}
                           </div>
                         </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 self-end text-xs text-muted-foreground hover:text-destructive sm:mt-0"
+                          onClick={() => removeDraftItem(item.id)}
+                          disabled={saving}
+                          aria-label={`Remove ${displayName}`}
+                        >
+                          Remove
+                        </Button>
                       </div>
                     )
                   })}
                 </div>
+
+                {categories.length > 0 && (
+                  <div className="mt-4 border-t pt-3">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">
+                      Add an item that was missed on your receipt.
+                    </p>
+                    <AddDraftItemForm
+                      categories={categories}
+                      onAdd={handleAddDraftItem}
+                    />
+                  </div>
+                )}
               </>
             )}
           </CardContent>

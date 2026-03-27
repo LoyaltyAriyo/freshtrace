@@ -431,4 +431,42 @@ describe("POST /api/receipts/[id]/review", () => {
     const body = await response.json()
     expect(body.error).toMatch(/invalid category/i)
   })
+
+  it("creates food items for addedItems even when no draft items are selected", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: RECEIPT_ID,
+      draftItems: [],
+    })
+    createManyMock.mockResolvedValue({ count: 1 })
+
+    const response = await POST(
+      makeRequest("POST", {
+        selectedItemIds: ["local-1"],
+        addedItems: [
+          {
+            name: "Manual Milk",
+            quantity: 1,
+            categoryId: "cat-dairy",
+          },
+        ],
+      }),
+      makeParams()
+    )
+
+    expect(response.status).toBe(201)
+    const body = await response.json()
+    expect(body.savedCount).toBe(1)
+
+    const createdData = createManyMock.mock.calls[0][0].data as Array<{
+      name: string
+      quantity: number
+      categoryId: string
+    }>
+    expect(createdData).toHaveLength(1)
+    expect(createdData[0]).toMatchObject({
+      name: "Manual Milk",
+      quantity: 1,
+      categoryId: "cat-dairy",
+    })
+  })
 })
