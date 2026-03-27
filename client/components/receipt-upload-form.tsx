@@ -14,6 +14,7 @@ type UploadState = "idle" | "uploading" | "error"
 export function ReceiptUploadForm() {
   const [state, setState] = useState<UploadState>("idle")
   const [progress, setProgress] = useState(0)
+  const [uploadStep, setUploadStep] = useState("Uploading image...")
   const [errorMsg, setErrorMsg] = useState("")
   const [dragActive, setDragActive] = useState(false)
   const [isWebcamActive, setIsWebcamActive] = useState(false)
@@ -220,6 +221,7 @@ export function ReceiptUploadForm() {
 
     setState("uploading")
     setProgress(25)
+    setUploadStep("Uploading image...")
     setErrorMsg("")
 
     try {
@@ -227,6 +229,7 @@ export function ReceiptUploadForm() {
       formData.append("receipt", file)
 
       setProgress(50)
+      setUploadStep("Extracting items with OCR...")
 
       const response = await fetch("/api/receipts", {
         method: "POST",
@@ -234,6 +237,7 @@ export function ReceiptUploadForm() {
       })
 
       setProgress(80)
+      setUploadStep("Saving results...")
 
       if (!response.ok) {
         const data = await response.json().catch(() => null)
@@ -243,6 +247,7 @@ export function ReceiptUploadForm() {
       const data = await response.json()
 
       setProgress(100)
+      setUploadStep("Done!")
 
       setTimeout(() => {
         router.push(`/scan/review?receiptId=${data.receiptId}`)
@@ -442,7 +447,7 @@ export function ReceiptUploadForm() {
           <CardContent className="flex items-center gap-4 py-4">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
             <div className="flex-1">
-              <p className="mb-2 text-sm font-medium text-foreground">Processing receipt...</p>
+              <p className="mb-2 text-sm font-medium text-foreground">{uploadStep}</p>
               <Progress value={progress} className="h-2" />
             </div>
             <span className="text-sm font-medium text-muted-foreground">{Math.round(progress)}%</span>
