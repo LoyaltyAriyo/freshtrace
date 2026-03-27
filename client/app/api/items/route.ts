@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 
 type ItemPriority = "use-first" | "use-soon" | "use-later"
+
 type FoodListQueryItem = {
   id: string
   name: string
@@ -12,6 +13,12 @@ type FoodListQueryItem = {
   }
 }
 
+type CreateFoodItemPayload = {
+  name: string
+  quantity: number
+  categoryId: string
+}
+
 function toPriority(dateAdded: Date): ItemPriority {
   const ageInDays =
     (Date.now() - new Date(dateAdded).getTime()) / (1000 * 60 * 60 * 24)
@@ -19,6 +26,14 @@ function toPriority(dateAdded: Date): ItemPriority {
   if (ageInDays >= 7) return "use-first"
   if (ageInDays >= 3) return "use-soon"
   return "use-later"
+}
+
+function badRequest(message: string) {
+  return Response.json({ error: message }, { status: 400 })
+}
+
+function serverError(message: string) {
+  return Response.json({ error: message }, { status: 500 })
 }
 
 export async function GET() {
@@ -57,10 +72,7 @@ export async function GET() {
     return Response.json(payload)
   } catch (error) {
     console.error("Failed to fetch food items:", error)
-    return Response.json(
-      { error: "Failed to load food items. Please try again." },
-      { status: 500 }
-    )
+    return serverError("Failed to load food items. Please try again.")
   }
 }
 
@@ -69,22 +81,23 @@ export async function POST(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 })
+    return badRequest("Invalid JSON body.")
   }
 
-  const { name, quantity, categoryId } = body as Record<string, unknown>
+  const { name, quantity, categoryId } = (body ?? {}) as CreateFoodItemPayload &
+    Record<string, unknown>
 
   if (!name || typeof name !== "string" || !name.trim()) {
-    return Response.json({ error: "Item name is required." }, { status: 400 })
+    return badRequest("Item name is required.")
   }
 
   if (!categoryId || typeof categoryId !== "string") {
-    return Response.json({ error: "Category is required." }, { status: 400 })
+    return badRequest("Category is required.")
   }
 
   const parsedQuantity = Number(quantity)
   if (!Number.isInteger(parsedQuantity) || parsedQuantity < 1) {
-    return Response.json({ error: "Quantity must be a whole number of at least 1." }, { status: 400 })
+    return badRequest("Quantity must be a whole number of at least 1.")
   }
 
   const category = await prisma.category.findUnique({ where: { id: categoryId } })
@@ -111,6 +124,6 @@ export async function POST(request: Request) {
     return Response.json(item, { status: 201 })
   } catch (error) {
     console.error("Failed to create food item:", error)
-    return Response.json({ error: "Failed to save item. Please try again." }, { status: 500 })
+    return serverError("Failed to save item. Please try again.")
   }
 }
