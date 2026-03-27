@@ -48,7 +48,7 @@ export function ManualEntryForm() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null)
-        throw new Error(data?.error || "Failed to save item.")
+        throw new Error(data?.error || "Failed to Add to Food List.")
       }
 
       router.push("/food-list")
