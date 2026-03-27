@@ -15,19 +15,34 @@ cd T5-W26-COMP231
 2. Install dependencies
 cd client
 npm install
-3. Set up the database (Prisma)
+3. Set up the database (Prisma, PostgreSQL)
 
-Make sure you are inside the client folder.
+Make sure you are inside the `client` folder.
 
-npx prisma generate
-npx prisma migrate dev
-npx prisma db seed
+- Generate the Prisma client (PostgreSQL)
+
+```bash
+cd client
+npm run prisma:generate
+```
+
+- Create or update the PostgreSQL schema
+
+```bash
+npm run prisma:push
+```
+
+- Seed default categories (Produce, Dairy, Meat, etc.)
+
+```bash
+npm run prisma:seed
+```
 
 This will:
 
-generate the Prisma client
-create the SQLite database
-seed default categories (Produce, Dairy, Meat, etc.)
+- generate the Prisma client targeting PostgreSQL
+- create or update the PostgreSQL schema using `DATABASE_URL`
+- seed default categories (Produce, Dairy, Meat, etc.)
 4. Run the application
 
 From the root (recommended):
@@ -71,4 +86,4 @@ Fresh Trace is a food tracking and waste reduction application developed for COM
 - TypeScript
 - Tailwind CSS
 - Prisma
-- SQLite
+- PostgreSQL (Supabase)
