@@ -566,4 +566,103 @@ describe("ReviewPage", () => {
       },
     ])
   })
+
+  it("falls back to the number of selected items when the backend response omits savedCount", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({
+          id: "receipt-123",
+          ocrStatus: "SUCCESS",
+          imagePath: "uploads/receipt.jpg",
+          draftItems: [
+            {
+              id: "draft-1",
+              name: "Milk",
+              quantity: 1,
+              categoryId: "cat-dairy",
+              confidence: 0.9,
+              isSelected: true,
+            },
+            {
+              id: "draft-2",
+              name: "Bread",
+              quantity: 1,
+              categoryId: "cat-bakery",
+              confidence: 0.9,
+              isSelected: true,
+            },
+          ],
+        }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: vi.fn().mockResolvedValue({}),
+      } as unknown as Response)
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<ReviewPage />)
+
+    await screen.findByText("Milk")
+    await screen.findByText("Bread")
+
+    fireEvent.click(screen.getByRole("button", { name: /confirm items/i }))
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/food-list?saved=1&count=2")
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("shows a category-specific error when the backend returns a 422 save error", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({
+          id: "receipt-123",
+          ocrStatus: "SUCCESS",
+          imagePath: "uploads/receipt.jpg",
+          draftItems: [
+            {
+              id: "draft-1",
+              name: "Milk",
+              quantity: 1,
+              categoryId: "cat-dairy",
+              confidence: 0.9,
+              isSelected: true,
+            },
+          ],
+        }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: vi.fn().mockResolvedValue({
+          error: 'Item "Milk" has an invalid category.',
+        }),
+      } as unknown as Response)
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<ReviewPage />)
+
+    await screen.findByText("Milk")
+
+    fireEvent.click(screen.getByRole("button", { name: /confirm items/i }))
+
+    const errorAlert = await screen.findByTestId("save-error")
+    expect(errorAlert).toHaveTextContent(/category required/i)
+    expect(errorAlert).toHaveTextContent(/invalid category/i)
+    expect(pushMock).not.toHaveBeenCalled()
+  })
 })
