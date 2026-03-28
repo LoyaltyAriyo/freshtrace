@@ -72,6 +72,9 @@ describe("POST /api/items/[id]/wasted", () => {
       changed: true,
     })
     expect(transactionMock).toHaveBeenCalledTimes(1)
+    // Ensure the route actually attempts to persist the wasted-item history entry.
+    expect(updateMock).toHaveBeenCalledTimes(1)
+    expect(upsertMock).toHaveBeenCalledTimes(1)
   })
 
   it("returns changed=false when item is already wasted", async () => {
