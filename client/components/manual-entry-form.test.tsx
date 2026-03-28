@@ -124,4 +124,42 @@ describe("ManualEntryForm", () => {
     expect(await screen.findByText(/failed to save item/i)).toBeInTheDocument()
     expect(pushMock).not.toHaveBeenCalled()
   })
+
+  it("shows an error and does not call the API when name is only whitespace", async () => {
+    render(<ManualEntryForm />)
+    fillForm({ name: "   " })
+
+    fireEvent.click(screen.getByRole("button", { name: /save item/i }))
+
+    expect(await screen.findByText(/item name is required/i)).toBeInTheDocument()
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled()
+  })
+
+  it("trims the item name before submitting to the API", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ id: "item-1" }),
+      } as unknown as Response)
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<ManualEntryForm />)
+    fillForm({ name: "  Milk  " })
+
+    fireEvent.click(screen.getByRole("button", { name: /save item/i }))
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/food-list"))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const parsedBody = JSON.parse(options.body as string)
+
+    expect(parsedBody).toMatchObject({
+      name: "Milk",
+      quantity: 2,
+      categoryId: "cat-1",
+    })
+  })
 })

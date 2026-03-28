@@ -131,6 +131,14 @@ describe("POST /api/items", () => {
     expect(body.error).toMatch(/quantity/i)
   })
 
+  it("returns 400 when name is only whitespace", async () => {
+    const response = await POST(makeRequest({ name: "   ", quantity: 1, categoryId: "cat-1" }))
+
+    expect(response.status).toBe(400)
+    const body = await response.json()
+    expect(body.error).toMatch(/name is required/i)
+  })
+
   it("returns 400 when quantity is a decimal", async () => {
     const response = await POST(makeRequest({ name: "Milk", quantity: 1.5, categoryId: "cat-1" }))
 
@@ -166,5 +174,26 @@ describe("POST /api/items", () => {
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body.error).toMatch(/failed to save/i)
+  })
+
+  it("trims the item name before saving", async () => {
+    findUniqueMock.mockResolvedValue({ id: "cat-1", name: "Dairy" })
+    createMock.mockResolvedValue({
+      id: "item-2",
+      name: "Milk",
+      quantity: 2,
+      categoryId: "cat-1",
+    })
+
+    const response = await POST(makeRequest({ name: "  Milk  ", quantity: 2, categoryId: "cat-1" }))
+
+    expect(response.status).toBe(201)
+    await response.json()
+
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: "Milk", quantity: 2, categoryId: "cat-1", source: "MANUAL" }),
+      }),
+    )
   })
 })
