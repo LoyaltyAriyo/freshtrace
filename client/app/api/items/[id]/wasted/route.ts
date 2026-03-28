@@ -13,6 +13,11 @@ export async function POST(_request: Request, { params }: Params) {
 		where: { id },
 		select: {
 			id: true,
+			name: true,
+			quantity: true,
+			categoryId: true,
+			source: true,
+			receiptId: true,
 			status: true,
 		},
 	})
@@ -33,16 +38,42 @@ export async function POST(_request: Request, { params }: Params) {
 	}
 
 	try {
-		const updated = await prisma.foodItem.update({
-			where: { id },
-			data: {
-				status: "WASTED",
-			},
-			select: {
-				id: true,
-				status: true,
-			},
-		})
+		const [updated] = await prisma.$transaction([
+			prisma.foodItem.update({
+				where: { id },
+				data: {
+					status: "WASTED",
+				},
+				select: {
+					id: true,
+					status: true,
+				},
+			}),
+			prisma.wastedItem.upsert({
+				where: {
+					foodItemId: existing.id,
+				},
+				create: {
+					foodItemId: existing.id,
+					name: existing.name,
+					quantity: existing.quantity,
+					categoryId: existing.categoryId,
+					source: existing.source,
+					receiptId: existing.receiptId,
+				},
+				update: {
+					name: existing.name,
+					quantity: existing.quantity,
+					categoryId: existing.categoryId,
+					source: existing.source,
+					receiptId: existing.receiptId,
+					markedWastedAt: new Date(),
+				},
+				select: {
+					id: true,
+				},
+			}),
+		])
 
 		return Response.json({ id: updated.id, status: updated.status, changed: true })
 	} catch (error) {

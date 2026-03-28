@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 vi.mock("@/lib/prisma", () => {
   const findUniqueMock = vi.fn()
   const updateMock = vi.fn()
+  const upsertMock = vi.fn()
+  const transactionMock = vi.fn()
 
   return {
     prisma: {
@@ -10,15 +12,21 @@ vi.mock("@/lib/prisma", () => {
         findUnique: findUniqueMock,
         update: updateMock,
       },
+      wastedItem: {
+        upsert: upsertMock,
+      },
+      $transaction: transactionMock,
     },
     findUniqueMock,
     updateMock,
+    upsertMock,
+    transactionMock,
   }
 })
 
 import { POST } from "./route"
 // @ts-expect-error - test-only mocked exports
-import { findUniqueMock, updateMock } from "@/lib/prisma"
+import { findUniqueMock, updateMock, upsertMock, transactionMock } from "@/lib/prisma"
 
 function makeParams(id: string) {
   return { params: Promise.resolve({ id }) }
@@ -28,6 +36,8 @@ describe("POST /api/items/[id]/wasted", () => {
   beforeEach(() => {
     findUniqueMock.mockReset()
     updateMock.mockReset()
+    upsertMock.mockReset()
+    transactionMock.mockReset()
   })
 
   it("returns 404 when item does not exist", async () => {
@@ -41,8 +51,16 @@ describe("POST /api/items/[id]/wasted", () => {
   })
 
   it("marks active item as wasted", async () => {
-    findUniqueMock.mockResolvedValue({ id: "item-1", status: "ACTIVE" })
-    updateMock.mockResolvedValue({ id: "item-1", status: "WASTED" })
+    findUniqueMock.mockResolvedValue({
+      id: "item-1",
+      name: "Chicken",
+      quantity: 1,
+      categoryId: "cat-meat",
+      source: "RECEIPT",
+      receiptId: "receipt-1",
+      status: "ACTIVE",
+    })
+    transactionMock.mockResolvedValue([{ id: "item-1", status: "WASTED" }, { id: "wasted-1" }])
 
     const response = await POST(new Request("http://localhost/api/items/item-1/wasted", { method: "POST" }), makeParams("item-1"))
 
@@ -53,7 +71,7 @@ describe("POST /api/items/[id]/wasted", () => {
       status: "WASTED",
       changed: true,
     })
-    expect(updateMock).toHaveBeenCalledTimes(1)
+    expect(transactionMock).toHaveBeenCalledTimes(1)
   })
 
   it("returns changed=false when item is already wasted", async () => {
@@ -68,7 +86,7 @@ describe("POST /api/items/[id]/wasted", () => {
       status: "WASTED",
       changed: false,
     })
-    expect(updateMock).not.toHaveBeenCalled()
+    expect(transactionMock).not.toHaveBeenCalled()
   })
 
   it("returns 409 when item status is not ACTIVE", async () => {
@@ -82,8 +100,16 @@ describe("POST /api/items/[id]/wasted", () => {
   })
 
   it("returns 500 when database update fails", async () => {
-    findUniqueMock.mockResolvedValue({ id: "item-1", status: "ACTIVE" })
-    updateMock.mockRejectedValue(new Error("DB connection lost"))
+    findUniqueMock.mockResolvedValue({
+      id: "item-1",
+      name: "Chicken",
+      quantity: 1,
+      categoryId: "cat-meat",
+      source: "RECEIPT",
+      receiptId: null,
+      status: "ACTIVE",
+    })
+    transactionMock.mockRejectedValue(new Error("DB connection lost"))
 
     const response = await POST(new Request("http://localhost/api/items/item-1/wasted", { method: "POST" }), makeParams("item-1"))
 
