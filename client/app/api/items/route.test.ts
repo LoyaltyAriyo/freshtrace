@@ -57,6 +57,18 @@ describe("GET /api/items", () => {
     })
   })
 
+  it("queries only ACTIVE items from Prisma", async () => {
+    findManyMock.mockResolvedValue([])
+
+    await GET()
+
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: "ACTIVE" },
+      }),
+    )
+  })
+
   it("returns 500 when loading items fails", async () => {
     findManyMock.mockRejectedValue(new Error("db down"))
 
