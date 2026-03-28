@@ -207,6 +207,7 @@ function FoodListPageContent() {
               </span>
               <button
                 onClick={() => markUsed(item.id)}
+                aria-label="Used"
                 disabled={updatingItemId === item.id}
                 className="rounded-md border px-3 py-1 text-xs hover:bg-muted flex items-center gap-1"
               >
@@ -214,6 +215,7 @@ function FoodListPageContent() {
               </button>
               <button
                 onClick={() => markWasted(item.id)}
+                aria-label="Wasted"
                 disabled={updatingItemId === item.id}
                 className="rounded-md border border-red-200 px-3 py-1 text-xs text-red-700 hover:bg-red-50 flex items-center gap-1"
               >

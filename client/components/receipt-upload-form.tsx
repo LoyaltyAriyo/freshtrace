@@ -209,7 +209,7 @@ export function ReceiptUploadForm() {
 
     if (!file.type.startsWith("image/")) {
       setState("error")
-      setErrorMsg("Invalid file type. Only JPG, PNG, and HEIC images are accepted. Please choose a valid image file.")
+      setErrorMsg("Invalid file type. Please upload an image (JPG, PNG, HEIC).")
       return
     }
 
