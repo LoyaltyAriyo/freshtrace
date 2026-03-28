@@ -469,4 +469,59 @@ describe("POST /api/receipts/[id]/review", () => {
       categoryId: "cat-dairy",
     })
   })
+
+  it("creates food items for both selected draft items and addedItems in a mixed payload", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: RECEIPT_ID,
+      draftItems: [
+        {
+          id: "draft-1",
+          name: "Milk",
+          quantity: 2,
+          categoryId: "cat-dairy",
+          isSelected: true,
+        },
+      ],
+    })
+    createManyMock.mockResolvedValue({ count: 2 })
+
+    const response = await POST(
+      makeRequest("POST", {
+        selectedItemIds: ["draft-1"],
+        addedItems: [
+          {
+            name: "Manual Bread",
+            quantity: 1,
+            categoryId: "cat-bakery",
+          },
+        ],
+      }),
+      makeParams()
+    )
+
+    expect(response.status).toBe(201)
+    const body = await response.json()
+    expect(body.savedCount).toBe(2)
+
+    const createdData = createManyMock.mock.calls[0][0].data as Array<{
+      name: string
+      quantity: number
+      categoryId: string
+    }>
+    expect(createdData).toHaveLength(2)
+    expect(createdData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Milk",
+          quantity: 2,
+          categoryId: "cat-dairy",
+        }),
+        expect.objectContaining({
+          name: "Manual Bread",
+          quantity: 1,
+          categoryId: "cat-bakery",
+        }),
+      ]),
+    )
+  })
 })
