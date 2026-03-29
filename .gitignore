@@ -218,6 +218,11 @@ PublishScripts/
 # Uncomment if necessary however generally it will be regenerated when needed
 #!**/[Pp]ackages/repositories.config
 # NuGet v3's project.json files produces more ignorable files
+
+# Project-specific generated artifacts
+client/.next/
+client/.next.bak-*/
+server/generated/
 *.nuget.props
 *.nuget.targets
 

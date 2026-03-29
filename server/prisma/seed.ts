@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient } from "../generated/client"
 import { DEFAULT_CATEGORIES } from "../../client/lib/category-utils"
 
 const prisma = new PrismaClient()

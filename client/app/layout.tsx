@@ -1,18 +1,7 @@
 import type { Metadata, Viewport } from "next"
-import { Inter, DM_Sans } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 import { AppNav } from "@/components/app-nav"
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-})
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  variable: "--font-dm-sans",
-})
 
 export const metadata: Metadata = {
   title: "Fresh Trace",
@@ -49,10 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        suppressHydrationWarning
-        className={`${inter.variable} ${dmSans.variable} font-sans antialiased`}
-      >
+      <body suppressHydrationWarning className="font-sans antialiased">
         <div className="min-h-screen bg-background">
           <AppNav />
           <main className="mx-auto max-w-6xl px-4 py-6 pb-24 md:pb-6">{children}</main>
