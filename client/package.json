@@ -10,15 +10,12 @@
     "prestart": "npm run prisma:generate",
     "start": "next start",
     "lint": "eslint",
-    "prisma:generate": "prisma generate --schema ../server/prisma/schema.prisma",
-    "prisma:push": "prisma db push --schema ../server/prisma/schema.prisma",
-    "prisma:seed": "prisma db seed --schema ../server/prisma/schema.prisma",
+    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
+    "prisma:push": "prisma db push --schema ./prisma/schema.prisma",
+    "prisma:seed": "prisma db seed --schema ./prisma/schema.prisma",
     "postinstall": "npm run prisma:generate",
     "test": "vitest",
     "test:watch": "vitest --watch"
-  },
-  "prisma": {
-    "seed": "tsx ../server/prisma/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -61,7 +58,7 @@
     "next": "16.2.0",
     "next-themes": "^0.4.6",
     "postcss": "^8.5.8",
-    "prisma": "^6.12.0",
+    "prisma": "^6.19.2",
     "react": "19.2.4",
     "react-day-picker": "^9.11.1",
     "react-dom": "19.2.4",
@@ -84,8 +81,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^10.1.0",
-    "eslint-config-next": "^12.0.4",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.2.0",
     "jsdom": "^29.0.0",
     "tailwindcss": "^4.2.2",
     "tsx": "^4.20.6",

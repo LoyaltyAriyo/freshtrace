@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 
 describe("Prisma Client WastedItem model", () => {
   it("exposes WastedItem in the Prisma ModelName enum", async () => {
-    const { Prisma } = await import("../../../server/generated/client")
+    const { Prisma } = await import("../generated/prisma-client")
 
     expect(Prisma).toBeDefined()
     expect(Prisma.ModelName).toBeDefined()

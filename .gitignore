@@ -222,6 +222,7 @@ PublishScripts/
 # Project-specific generated artifacts
 client/.next/
 client/.next.bak-*/
+client/generated/
 server/generated/
 *.nuget.props
 *.nuget.targets
