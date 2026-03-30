@@ -16,16 +16,6 @@ const TESSERACT_ENABLED =
 	process.env.NEXT_PUBLIC_TESSERACT_ENABLED === "true" ||
 	process.env.TESSERACT_ENABLED === "true"
 
-const TESSERACT_WORKER_PATH = path.join(
-	process.cwd(),
-	"node_modules",
-	"tesseract.js",
-	"src",
-	"worker-script",
-	"node",
-	"index.js",
-)
-
 const TESSERACT_LANG_PATH = process.cwd()
 const TESSERACT_CACHE_PATH = process.env.VERCEL ? "/tmp" : process.cwd()
 
@@ -110,7 +100,6 @@ export async function extractReceiptDraftItems(imageBytes: Uint8Array): Promise<
 		// Uint8Array from storage in a Node Buffer for type safety.
 		const input = Buffer.from(imageBytes)
 		const workerOptions = {
-			workerPath: TESSERACT_WORKER_PATH,
 			langPath: TESSERACT_LANG_PATH,
 			cachePath: TESSERACT_CACHE_PATH,
 			gzip: false,
