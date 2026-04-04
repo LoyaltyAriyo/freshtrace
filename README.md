@@ -74,6 +74,30 @@ npm run dev
 
 This clears the old Prisma client and Next.js build artifacts, then regenerates the Prisma client and syncs the PostgreSQL schema and seed data before starting the dev server.
 
+## Admin Bootstrap Script
+
+The project includes a one-time bootstrap utility to ensure an admin account exists in both Supabase Auth and the public `User` table in PostgreSQL.
+
+To run it from the project root:
+
+```bash
+npm run bootstrap:admin
+```
+
+Before running this command, make sure the following environment variables are available to the Node process (for example via your shell or an `.env` file that is loaded for scripts):
+
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `ADMIN_FULL_NAME`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+The script will:
+
+- create or reuse a Supabase Auth user with `ADMIN_EMAIL`
+- create or update a matching Prisma `User` record with role `ADMIN` and account status `ACTIVE`
+- safely handle repeated runs without creating duplicates
+
 # Fresh Trace
 
 Fresh Trace is a food tracking and waste reduction application developed for COMP231 using Agile Scrum.
