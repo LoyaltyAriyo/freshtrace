@@ -10,6 +10,7 @@ type FoodListQueryItem = {
   dateAdded: Date
   status: string
   category: {
+    id: string
     name: string
   }
 }
@@ -61,6 +62,7 @@ export async function GET(request: Request) {
         status: true,
         category: {
           select: {
+            id: true,
             name: true,
           },
         },
@@ -73,6 +75,7 @@ export async function GET(request: Request) {
       quantity: item.quantity,
       dateAdded: item.dateAdded,
       status: item.status,
+      categoryId: item.category.id,
       categoryName: item.category.name,
       priority: toPriority(item.dateAdded),
     }))
