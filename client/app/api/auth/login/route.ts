@@ -19,16 +19,37 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
-    if (
-      error.message.toLowerCase().includes("invalid login") ||
-      error.message.toLowerCase().includes("invalid credentials")
-    ) {
+    const msg = error.message.toLowerCase()
+
+    if (msg.includes("invalid login") || msg.includes("invalid credentials") || msg.includes("invalid email or password")) {
       return Response.json(
         { error: "Invalid email or password." },
         { status: 401 }
       )
     }
-    return Response.json({ error: error.message }, { status: 400 })
+
+    if (msg.includes("email not confirmed")) {
+      return Response.json(
+        { error: "Please confirm your email address before signing in. Check your inbox." },
+        { status: 403 }
+      )
+    }
+
+    if (msg.includes("disabled") || msg.includes("banned")) {
+      return Response.json(
+        { error: "Your account has been disabled. Please contact support." },
+        { status: 403 }
+      )
+    }
+
+    if (msg.includes("rate limit") || msg.includes("too many requests")) {
+      return Response.json(
+        { error: "Too many login attempts. Please wait a moment and try again." },
+        { status: 429 }
+      )
+    }
+
+    return Response.json({ error: "Login failed. Please try again." }, { status: 400 })
   }
 
   return Response.json({
