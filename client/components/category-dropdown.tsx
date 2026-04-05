@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useId, useState } from "react"
 import {
   Select,
   SelectContent,
@@ -19,6 +19,8 @@ type Props = {
   onValueChange: (value: string) => void
   disabled?: boolean
   placeholder?: string
+  /** When set, marks the control invalid and shows the message below (e.g. form validation). */
+  errorMessage?: string
 }
 
 export function CategoryDropdown({
@@ -26,7 +28,9 @@ export function CategoryDropdown({
   onValueChange,
   disabled = false,
   placeholder = "Select category",
+  errorMessage,
 }: Props) {
+  const errorId = useId()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -41,17 +45,28 @@ export function CategoryDropdown({
   }, [])
 
   return (
-    <Select value={value} onValueChange={onValueChange} disabled={disabled || loading}>
-      <SelectTrigger aria-label="Category">
-        <SelectValue placeholder={loading ? "Loading…" : placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {categories.map((cat) => (
-          <SelectItem key={cat.id} value={cat.id}>
-            {cat.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="flex flex-col gap-1">
+      <Select value={value} onValueChange={onValueChange} disabled={disabled || loading}>
+        <SelectTrigger
+          aria-label="Category"
+          aria-invalid={errorMessage ? true : undefined}
+          aria-describedby={errorMessage ? errorId : undefined}
+        >
+          <SelectValue placeholder={loading ? "Loading…" : placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {categories.map((cat) => (
+            <SelectItem key={cat.id} value={cat.id}>
+              {cat.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {errorMessage ? (
+        <p id={errorId} className="text-sm text-destructive" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
+    </div>
   )
 }

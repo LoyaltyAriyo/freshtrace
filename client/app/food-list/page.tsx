@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useId, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
@@ -34,8 +34,44 @@ const priorityStyles: Record<string, string> = {
   "use-later": "bg-green-100 text-green-800",
 }
 
+type EditFieldErrors = {
+  name?: string
+  quantity?: string
+  categoryId?: string
+}
+
+function validateEditedItemInput(
+  name: string,
+  quantityInput: string,
+  categoryId: string,
+): EditFieldErrors | null {
+  const errors: EditFieldErrors = {}
+  const trimmedName = name.trim()
+  if (!trimmedName) {
+    errors.name = "Item name is required."
+  }
+
+  const qtyRaw = quantityInput.trim()
+  if (qtyRaw === "") {
+    errors.quantity = "Quantity must be a whole number of at least 1."
+  } else {
+    const parsed = Number(qtyRaw)
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 1) {
+      errors.quantity = "Quantity must be a whole number of at least 1."
+    }
+  }
+
+  if (!categoryId.trim()) {
+    errors.categoryId = "Please select a category."
+  }
+
+  return Object.keys(errors).length > 0 ? errors : null
+}
+
 function FoodListPageContent() {
   const searchParams = useSearchParams()
+  const editNameErrorId = useId()
+  const editQuantityErrorId = useId()
   const [items, setItems] = useState<FoodListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -45,8 +81,9 @@ function FoodListPageContent() {
   const [editOpen, setEditOpen] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
-  const [editQuantity, setEditQuantity] = useState(1)
+  const [editQuantityInput, setEditQuantityInput] = useState("1")
   const [editCategoryId, setEditCategoryId] = useState("")
+  const [editFieldErrors, setEditFieldErrors] = useState<EditFieldErrors>({})
   const [editSaving, setEditSaving] = useState(false)
   const [editFeedback, setEditFeedback] = useState<{
     type: "success" | "error"
@@ -177,9 +214,10 @@ function FoodListPageContent() {
   function openEdit(item: FoodListItem) {
     setEditFeedback(null)
     setActionError("")
+    setEditFieldErrors({})
     setEditingItemId(item.id)
     setEditName(item.name)
-    setEditQuantity(item.quantity)
+    setEditQuantityInput(String(item.quantity))
     setEditCategoryId(item.categoryId)
     setEditOpen(true)
   }
@@ -187,16 +225,27 @@ function FoodListPageContent() {
   async function saveEditedItem() {
     if (!editingItemId) return
 
-    setEditSaving(true)
     setEditFeedback(null)
+
+    const validation = validateEditedItemInput(editName, editQuantityInput, editCategoryId)
+    if (validation) {
+      setEditFieldErrors(validation)
+      return
+    }
+
+    setEditFieldErrors({})
+    const trimmedName = editName.trim()
+    const parsedQuantity = Number.parseInt(editQuantityInput.trim(), 10)
+
+    setEditSaving(true)
 
     try {
       const response = await fetch(`/api/items/${editingItemId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: editName,
-          quantity: editQuantity,
+          name: trimmedName,
+          quantity: parsedQuantity,
           categoryId: editCategoryId,
         }),
       })
@@ -211,7 +260,7 @@ function FoodListPageContent() {
         return
       }
 
-      const displayName = typeof data?.name === "string" && data.name.trim() ? data.name : editName.trim()
+      const displayName = typeof data?.name === "string" && data.name.trim() ? data.name : trimmedName
 
       setEditOpen(false)
       setEditingItemId(null)
@@ -347,6 +396,7 @@ function FoodListPageContent() {
           if (!open) {
             setEditingItemId(null)
             setEditSaving(false)
+            setEditFieldErrors({})
             setEditFeedback((prev) => (prev?.type === "error" ? null : prev))
           }
         }}
@@ -362,9 +412,24 @@ function FoodListPageContent() {
               <Input
                 id="edit-item-name"
                 value={editName}
-                onChange={(e) => setEditName(e.target.value)}
+                onChange={(e) => {
+                  setEditName(e.target.value)
+                  setEditFieldErrors((prev) => {
+                    if (!prev.name) return prev
+                    const next = { ...prev }
+                    delete next.name
+                    return next
+                  })
+                }}
                 disabled={editSaving}
+                aria-invalid={editFieldErrors.name ? true : undefined}
+                aria-describedby={editFieldErrors.name ? editNameErrorId : undefined}
               />
+              {editFieldErrors.name ? (
+                <p id={editNameErrorId} className="text-sm text-destructive" role="alert">
+                  {editFieldErrors.name}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col gap-1">
               <Label htmlFor="edit-item-quantity">Quantity</Label>
@@ -372,17 +437,42 @@ function FoodListPageContent() {
                 id="edit-item-quantity"
                 type="number"
                 min={1}
-                value={editQuantity}
-                onChange={(e) => setEditQuantity(Math.max(1, Number(e.target.value)))}
+                step={1}
+                value={editQuantityInput}
+                onChange={(e) => {
+                  setEditQuantityInput(e.target.value)
+                  setEditFieldErrors((prev) => {
+                    if (!prev.quantity) return prev
+                    const next = { ...prev }
+                    delete next.quantity
+                    return next
+                  })
+                }}
                 disabled={editSaving}
+                aria-invalid={editFieldErrors.quantity ? true : undefined}
+                aria-describedby={editFieldErrors.quantity ? editQuantityErrorId : undefined}
               />
+              {editFieldErrors.quantity ? (
+                <p id={editQuantityErrorId} className="text-sm text-destructive" role="alert">
+                  {editFieldErrors.quantity}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col gap-1">
               <Label>Category</Label>
               <CategoryDropdown
                 value={editCategoryId}
-                onValueChange={setEditCategoryId}
+                onValueChange={(value) => {
+                  setEditCategoryId(value)
+                  setEditFieldErrors((prev) => {
+                    if (!prev.categoryId) return prev
+                    const next = { ...prev }
+                    delete next.categoryId
+                    return next
+                  })
+                }}
                 disabled={editSaving}
+                errorMessage={editFieldErrors.categoryId}
               />
             </div>
           </div>

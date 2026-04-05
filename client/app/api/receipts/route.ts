@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { ensureCategories, findCategoryIdForItemName } from "@/lib/category-utils"
 import { extractReceiptDraftItems } from "@/lib/ocr"
 import { supabaseAdmin } from "@/lib/supabase/server"
+import { getCurrentUserId } from "@/lib/auth"
 
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
@@ -47,6 +48,15 @@ async function downloadReceiptObjectBytes(objectPath: string): Promise<Uint8Arra
 
 export async function POST(request: Request) {
   try {
+    const userId = await getCurrentUserId(request)
+
+    if (!userId) {
+      return Response.json(
+        { error: "You must be signed in to upload receipts." },
+        { status: 401 }
+      )
+    }
+
     const formData = await request.formData()
     const entry = formData.get("receipt")
 
@@ -98,6 +108,7 @@ export async function POST(request: Request) {
         data: {
           imagePath: objectPath,
           ocrStatus: "PENDING",
+          userId,
         },
         select: {
           id: true,

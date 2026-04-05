@@ -280,4 +280,96 @@ describe("FoodListPage success confirmation", () => {
     expect(errorAlert).toHaveTextContent("Could not save changes")
     expect(errorAlert).toHaveTextContent("Item name is required.")
   })
+
+  it("does not call PATCH when the name is blank after client validation", async () => {
+    getSearchParamMock.mockReturnValue(null)
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            id: "item-1",
+            name: "Milk",
+            quantity: 1,
+            categoryId: "cat-dairy",
+            categoryName: "Dairy",
+            dateAdded: "2026-03-22T00:00:00.000Z",
+            priority: "use-soon",
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([{ id: "cat-dairy", name: "Dairy" }]),
+      })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<FoodListPage />)
+
+    expect(await screen.findByText("Milk")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument()
+    })
+
+    const callsAfterOpen = fetchMock.mock.calls.length
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "   " } })
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
+
+    expect(await screen.findByText("Item name is required.")).toBeInTheDocument()
+    expect(fetchMock.mock.calls.length).toBe(callsAfterOpen)
+  })
+
+  it("does not call PATCH when quantity is invalid after client validation", async () => {
+    getSearchParamMock.mockReturnValue(null)
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            id: "item-1",
+            name: "Milk",
+            quantity: 1,
+            categoryId: "cat-dairy",
+            categoryName: "Dairy",
+            dateAdded: "2026-03-22T00:00:00.000Z",
+            priority: "use-soon",
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([{ id: "cat-dairy", name: "Dairy" }]),
+      })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<FoodListPage />)
+
+    expect(await screen.findByText("Milk")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument()
+    })
+
+    const callsAfterOpen = fetchMock.mock.calls.length
+
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "0" } })
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
+
+    expect(
+      await screen.findByText("Quantity must be a whole number of at least 1."),
+    ).toBeInTheDocument()
+    expect(fetchMock.mock.calls.length).toBe(callsAfterOpen)
+  })
 })

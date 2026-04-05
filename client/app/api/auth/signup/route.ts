@@ -1,5 +1,7 @@
-import { supabase } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
@@ -17,6 +19,20 @@ export async function POST(request: Request) {
     )
   }
 
+  if (!EMAIL_REGEX.test(email)) {
+    return Response.json(
+      { error: "Please enter a valid email address." },
+      { status: 400 }
+    )
+  }
+
+  if (typeof fullName !== "string" || fullName.trim().length < 2) {
+    return Response.json(
+      { error: "Full name must be at least 2 characters." },
+      { status: 400 }
+    )
+  }
+
   if (password.length < 6) {
     return Response.json(
       { error: "Password must be at least 6 characters." },
@@ -24,16 +40,37 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data, error } = await supabase.auth.signUp({ email, password })
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
 
   if (error) {
-    if (error.message.toLowerCase().includes("already registered")) {
+    const msg = (error.message ?? String(error)).toLowerCase()
+
+    if (msg.includes("already registered") || msg.includes("user already exists")) {
       return Response.json(
         { error: "An account with this email already exists." },
         { status: 409 }
       )
     }
-    return Response.json({ error: error.message }, { status: 400 })
+
+    if (msg.includes("rate limit") || msg.includes("too many requests")) {
+      return Response.json(
+        { error: "Too many signup attempts. Please wait a moment and try again." },
+        { status: 429 }
+      )
+    }
+
+    if (msg.includes("invalid email")) {
+      return Response.json(
+        { error: "Please enter a valid email address." },
+        { status: 400 }
+      )
+    }
+
+    return Response.json({ error: "Signup failed. Please try again." }, { status: 400 })
   }
 
   if (!data.user) {
@@ -45,7 +82,7 @@ export async function POST(request: Request) {
       data: {
         id: data.user.id,
         email: data.user.email!,
-        fullName,
+        fullName: fullName.trim(),
       },
     })
   } catch {

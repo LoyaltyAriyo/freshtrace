@@ -9,6 +9,7 @@ import { RecentAlerts } from "@/components/recent-alerts"
 import { sampleAlerts } from "@/lib/data"
 import type { FoodItem } from "@/lib/data"
 import { Loader2, Plus, ScanLine } from "lucide-react"
+import MetricCard from "@/components/ui/metric-card" // ✅ ADD THIS
 
 type PrioritizedResponse = {
   items: FoodItem[]
@@ -109,6 +110,34 @@ export default function HomePage() {
           <span>Loading priority overview...</span>
         </div>
       )}
+
+      {/* ✅ Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <MetricCard
+          title="Total Items"
+          value={loading ? "..." : priorityData.items.length}
+          icon={<ScanLine />}
+        />
+
+        <MetricCard
+          title="Use First"
+          value={loading ? "..." : priorityData.useFirst.length}
+          description="High priority"
+          icon={<Loader2 />}
+        />
+
+        <MetricCard
+          title="Use Soon"
+          value={loading ? "..." : priorityData.useSoon.length}
+          description="Medium priority"
+        />
+
+        <MetricCard
+          title="Use Later"
+          value={loading ? "..." : priorityData.useLater.length}
+          description="Low priority"
+        />
+      </div>
 
       {/* Priority Overview */}
       <section aria-label="Priority overview">

@@ -5,7 +5,8 @@
     "dev": "cd client && npm run dev",
     "dev:client": "cd client && npm run dev",
     "dev:server": "echo \"No separate server dev process yet; server/ currently only contains Prisma schema, seed, and utility scripts.\"",
-    "bootstrap:admin": "node ./server/scripts/bootstrap-admin.mjs"
+    "bootstrap:admin": "node ./server/scripts/bootstrap-admin.mjs",
+    "cleanup:inventory": "node ./server/scripts/cleanup-inventory-test-data.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",

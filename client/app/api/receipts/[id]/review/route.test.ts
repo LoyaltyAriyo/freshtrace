@@ -26,6 +26,12 @@ vi.mock("@/lib/prisma", () => {
   }
 })
 
+vi.mock("@/lib/auth", () => {
+  return {
+    getCurrentUserId: vi.fn().mockResolvedValue("user-123"),
+  }
+})
+
 import { GET, POST } from "./route"
 // @ts-expect-error - test-only mocked exports
 import { findUniqueMock, createManyMock, findCategoriesMock, createCategoriesMock } from "@/lib/prisma"
@@ -70,6 +76,7 @@ describe("GET /api/receipts/[id]/review", () => {
       id: RECEIPT_ID,
       ocrStatus: "SUCCESS",
       imagePath: "uploads/receipt.jpg",
+      userId: "user-123",
       draftItems: [
         {
           id: "draft-1",
@@ -117,6 +124,7 @@ describe("GET /api/receipts/[id]/review", () => {
       id: RECEIPT_ID,
       ocrStatus: "PENDING",
       imagePath: "uploads/receipt.jpg",
+      userId: "user-123",
       draftItems: [],
     })
     findCategoriesMock.mockResolvedValue([])
@@ -207,6 +215,7 @@ describe("POST /api/receipts/[id]/review", () => {
   it("returns 422 when a selected draft item has no category", async () => {
     findUniqueMock.mockResolvedValue({
       id: RECEIPT_ID,
+      userId: "user-123",
       draftItems: [
         {
           id: "draft-1",
@@ -231,6 +240,7 @@ describe("POST /api/receipts/[id]/review", () => {
   it("creates food items for selected draft items and returns 201", async () => {
     findUniqueMock.mockResolvedValue({
       id: RECEIPT_ID,
+      userId: "user-123",
       draftItems: [
         {
           id: "draft-1",
@@ -276,6 +286,7 @@ describe("POST /api/receipts/[id]/review", () => {
   it("only saves selected items, ignores unselected ones", async () => {
     findUniqueMock.mockResolvedValue({
       id: RECEIPT_ID,
+      userId: "user-123",
       draftItems: [
         {
           id: "draft-1",
@@ -311,6 +322,7 @@ describe("POST /api/receipts/[id]/review", () => {
   it("returns 500 when database write fails", async () => {
     findUniqueMock.mockResolvedValue({
       id: RECEIPT_ID,
+      userId: "user-123",
       draftItems: [
         {
           id: "draft-1",
@@ -357,6 +369,7 @@ describe("POST /api/receipts/[id]/review", () => {
   it("uses edited item values when saving", async () => {
     findUniqueMock.mockResolvedValue({
       id: RECEIPT_ID,
+      userId: "user-123",
       draftItems: [
         {
           id: "draft-1",
@@ -400,6 +413,7 @@ describe("POST /api/receipts/[id]/review", () => {
   it("returns 422 when an edited item category is invalid", async () => {
     findUniqueMock.mockResolvedValue({
       id: RECEIPT_ID,
+      userId: "user-123",
       draftItems: [
         {
           id: "draft-1",
@@ -435,6 +449,7 @@ describe("POST /api/receipts/[id]/review", () => {
   it("creates food items for addedItems even when no draft items are selected", async () => {
     findUniqueMock.mockResolvedValue({
       id: RECEIPT_ID,
+      userId: "user-123",
       draftItems: [],
     })
     createManyMock.mockResolvedValue({ count: 1 })
@@ -473,6 +488,7 @@ describe("POST /api/receipts/[id]/review", () => {
   it("creates food items for both selected draft items and addedItems in a mixed payload", async () => {
     findUniqueMock.mockResolvedValue({
       id: RECEIPT_ID,
+      userId: "user-123",
       draftItems: [
         {
           id: "draft-1",

@@ -1,9 +1,11 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 export default function LoginPage() {
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -17,8 +19,40 @@ export default function LoginPage() {
     }
     setLoading(true)
     setError("")
-    // TODO: connect to auth API
-    setLoading(false)
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        const apiError =
+          (data && (data.error || data.message)) ?? null
+        setError(
+          typeof apiError === "string"
+            ? apiError
+            : "Something went wrong"
+        )
+        return
+      }
+
+      const role = data?.user?.role
+
+      if (role === "ADMIN") {
+        router.push("/admin")
+      } else {
+        router.push("/")
+      }
+    } catch (error: any) {
+      setError(error?.message || "Something went wrong")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
