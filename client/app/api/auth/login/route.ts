@@ -1,4 +1,6 @@
-import { supabase } from "@/lib/supabase"
+import { createServerClient } from "@supabase/ssr"
+import { parse as parseCookie, serialize as serializeCookie } from "cookie"
+import { prisma } from "@/lib/prisma"
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
@@ -16,7 +18,39 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  const cookieHeader = request.headers.get("cookie") ?? ""
+  const existingCookies = parseCookie(cookieHeader)
+
+  const getAllCookies = () =>
+    Object.entries(existingCookies).map(([name, value]) => ({
+      name,
+      value: String(value),
+    }))
+  const cookiesToSet: {
+    name: string
+    value: string
+    options: import("cookie").SerializeOptions
+  }[] = []
+  let responseHeaders: Record<string, string> = {}
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: getAllCookies,
+        setAll(cookies, headers) {
+          cookiesToSet.push(...cookies)
+          responseHeaders = { ...responseHeaders, ...headers }
+        },
+      },
+    }
+  )
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
 
   if (error) {
     const msg = error.message.toLowerCase()
@@ -52,14 +86,38 @@ export async function POST(request: Request) {
     return Response.json({ error: "Login failed. Please try again." }, { status: 400 })
   }
 
-  return Response.json({
+  let appUser: { role: string | null } | null = null
+  try {
+    appUser = await prisma.user.findUnique({
+      where: { id: data.user.id },
+      select: { role: true },
+    })
+  } catch {
+    // If this fails, we still return a successful login response without role information.
+  }
+
+  const response = Response.json({
     user: {
       id: data.user.id,
       email: data.user.email,
+      role: appUser?.role ?? null,
     },
     session: {
       accessToken: data.session.access_token,
       expiresAt: data.session.expires_at,
     },
   })
+
+  Object.entries(responseHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+
+  cookiesToSet.forEach((cookie) => {
+    response.headers.append(
+      "Set-Cookie",
+      serializeCookie(cookie.name, cookie.value, cookie.options)
+    )
+  })
+
+  return response
 }

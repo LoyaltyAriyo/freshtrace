@@ -1,14 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 export default function SignupPage() {
+  const router = useRouter()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -23,8 +26,71 @@ export default function SignupPage() {
     }
     setLoading(true)
     setError("")
-    // TODO: connect to auth API
-    setLoading(false)
+    setSuccess("")
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName: name,
+        }),
+      })
+
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        const apiError =
+          (data && (data.error || data.message)) ?? null
+        setError(
+          typeof apiError === "string"
+            ? apiError
+            : "Something went wrong"
+        )
+        return
+      }
+
+      setSuccess("Account created successfully. Signing you in...")
+
+      // Attempt automatic sign-in so the user lands on the correct dashboard.
+      const loginResponse = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const loginData = await loginResponse.json().catch(() => null)
+
+      if (!loginResponse.ok) {
+        const apiError =
+          (loginData && (loginData.error || loginData.message)) ?? null
+        setError(
+          typeof apiError === "string"
+            ? apiError
+            : "Account created, but automatic sign-in failed. Please log in."
+        )
+        setSuccess("")
+        router.push("/login")
+        return
+      }
+
+      const role = loginData?.user?.role
+
+      if (role === "ADMIN") {
+        router.push("/admin")
+      } else {
+        router.push("/")
+      }
+    } catch (error: any) {
+      setError(error?.message || "Something went wrong")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

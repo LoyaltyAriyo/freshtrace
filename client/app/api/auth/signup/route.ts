@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase"
+import { supabaseAdmin } from "@/lib/supabase/server"
 import { prisma } from "@/lib/prisma"
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -40,10 +40,14 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data, error } = await supabase.auth.signUp({ email, password })
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
 
   if (error) {
-    const msg = error.message.toLowerCase()
+    const msg = (error.message ?? String(error)).toLowerCase()
 
     if (msg.includes("already registered") || msg.includes("user already exists")) {
       return Response.json(

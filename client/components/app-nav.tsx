@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Home, ScanLine, UtensilsCrossed, User } from "lucide-react"
 
@@ -15,6 +16,22 @@ const userNav = [
 
 export function AppNav() {
   const pathname = usePathname()
+  const router = useRouter()
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function handleSignOut() {
+    if (signingOut) return
+    setSigningOut(true)
+    try {
+      await fetch("/api/auth/logout", { method: "POST" })
+    } catch {
+      // Minimal handling: ignore and still redirect.
+    } finally {
+      setSigningOut(false)
+      router.push("/login")
+      router.refresh()
+    }
+  }
 
   return (
     <>
@@ -54,6 +71,17 @@ export function AppNav() {
                 </Link>
               )
             })}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className={cn(
+                "ml-2 flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
+              )}
+            >
+              {signingOut ? "Signing out..." : "Sign out"}
+            </button>
           </nav>
         </div>
       </header>
