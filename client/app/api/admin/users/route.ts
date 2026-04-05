@@ -1,16 +1,54 @@
 import { NextResponse } from "next/server"
 
+import type { Prisma } from "@/generated/prisma-client"
+
 import { requireAdmin } from "@/lib/auth/require-admin"
 import { prisma } from "@/lib/prisma"
 
-export async function GET() {
+function parseUserListQuery(url: URL): { ok: true; where: Prisma.UserWhereInput } | { ok: false; response: NextResponse } {
+  const q = url.searchParams.get("q")?.trim() ?? ""
+  const statusRaw = url.searchParams.get("status")?.trim().toUpperCase() ?? ""
+
+  if (statusRaw && statusRaw !== "ALL" && statusRaw !== "ACTIVE" && statusRaw !== "DISABLED") {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Invalid status. Use "all", "ACTIVE", or "DISABLED".' },
+        { status: 400 },
+      ),
+    }
+  }
+
+  const where: Prisma.UserWhereInput = {}
+
+  if (statusRaw === "ACTIVE" || statusRaw === "DISABLED") {
+    where.accountStatus = statusRaw
+  }
+
+  if (q.length > 0) {
+    where.OR = [
+      { fullName: { contains: q, mode: "insensitive" } },
+      { email: { contains: q, mode: "insensitive" } },
+    ]
+  }
+
+  return { ok: true, where }
+}
+
+export async function GET(request: Request) {
   const auth = await requireAdmin()
   if (!auth.ok) {
     return auth.response
   }
 
+  const parsed = parseUserListQuery(new URL(request.url))
+  if (!parsed.ok) {
+    return parsed.response
+  }
+
   try {
     const rows = await prisma.user.findMany({
+      where: parsed.where,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

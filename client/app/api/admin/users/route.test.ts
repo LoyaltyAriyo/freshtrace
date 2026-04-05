@@ -32,7 +32,7 @@ describe("GET /api/admin/users", () => {
       response: NextResponse.json({ error: "Unauthorized." }, { status: 401 }),
     })
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/admin/users"))
 
     expect(response.status).toBe(401)
   })
@@ -43,7 +43,7 @@ describe("GET /api/admin/users", () => {
       response: NextResponse.json({ error: "Forbidden." }, { status: 403 }),
     })
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/admin/users"))
 
     expect(response.status).toBe(403)
   })
@@ -65,7 +65,7 @@ describe("GET /api/admin/users", () => {
       },
     ])
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/admin/users"))
 
     expect(response.status).toBe(200)
     const body = await response.json()
@@ -82,6 +82,7 @@ describe("GET /api/admin/users", () => {
     })
     expect(findManyUserMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: {},
         orderBy: { createdAt: "desc" },
         select: expect.objectContaining({
           email: true,
@@ -92,11 +93,70 @@ describe("GET /api/admin/users", () => {
     )
   })
 
+  it("applies search q on fullName and email (case-insensitive)", async () => {
+    requireAdminMock.mockResolvedValue({ ok: true })
+    findManyUserMock.mockResolvedValue([])
+
+    await GET(new Request("http://localhost/api/admin/users?q=ada"))
+
+    expect(findManyUserMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            { fullName: { contains: "ada", mode: "insensitive" } },
+            { email: { contains: "ada", mode: "insensitive" } },
+          ],
+        },
+      }),
+    )
+  })
+
+  it("applies status filter when status is ACTIVE or DISABLED", async () => {
+    requireAdminMock.mockResolvedValue({ ok: true })
+    findManyUserMock.mockResolvedValue([])
+
+    await GET(new Request("http://localhost/api/admin/users?status=ACTIVE"))
+
+    expect(findManyUserMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { accountStatus: "ACTIVE" },
+      }),
+    )
+  })
+
+  it("combines q and status filters", async () => {
+    requireAdminMock.mockResolvedValue({ ok: true })
+    findManyUserMock.mockResolvedValue([])
+
+    await GET(new Request("http://localhost/api/admin/users?q=test&status=DISABLED"))
+
+    expect(findManyUserMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          accountStatus: "DISABLED",
+          OR: [
+            { fullName: { contains: "test", mode: "insensitive" } },
+            { email: { contains: "test", mode: "insensitive" } },
+          ],
+        },
+      }),
+    )
+  })
+
+  it("returns 400 for invalid status query", async () => {
+    requireAdminMock.mockResolvedValue({ ok: true })
+
+    const response = await GET(new Request("http://localhost/api/admin/users?status=maybe"))
+
+    expect(response.status).toBe(400)
+    expect(findManyUserMock).not.toHaveBeenCalled()
+  })
+
   it("returns 500 when findMany throws", async () => {
     requireAdminMock.mockResolvedValue({ ok: true })
     findManyUserMock.mockRejectedValue(new Error("db"))
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/admin/users"))
 
     expect(response.status).toBe(500)
     const body = await response.json()
