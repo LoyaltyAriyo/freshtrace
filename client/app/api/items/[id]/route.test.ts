@@ -21,6 +21,12 @@ vi.mock("@/lib/prisma", () => {
   }
 })
 
+vi.mock("@/lib/auth", () => {
+  return {
+    getCurrentUserId: vi.fn().mockResolvedValue("user-123"),
+  }
+})
+
 import { GET, PATCH } from "./route"
 // @ts-expect-error - test-only mocked exports
 import { findCategoryMock, findFoodItemMock, updateMock } from "@/lib/prisma"
@@ -47,6 +53,7 @@ describe("GET /api/items/[id]", () => {
       id: "item-1",
       name: "Milk",
       quantity: 2,
+      userId: "user-123",
       category: { id: "cat-1", name: "Dairy" },
     })
 
@@ -80,7 +87,7 @@ describe("PATCH /api/items/[id]", () => {
   })
 
   it("updates the item and returns the updated record", async () => {
-    findFoodItemMock.mockResolvedValue({ id: "item-1" })
+    findFoodItemMock.mockResolvedValue({ id: "item-1", userId: "user-123" })
     findCategoryMock.mockResolvedValue({ id: "cat-1" })
     updateMock.mockResolvedValue({
       id: "item-1",
@@ -170,7 +177,7 @@ describe("PATCH /api/items/[id]", () => {
   })
 
   it("returns 422 when category does not exist", async () => {
-    findFoodItemMock.mockResolvedValue({ id: "item-1" })
+    findFoodItemMock.mockResolvedValue({ id: "item-1", userId: "user-123" })
     findCategoryMock.mockResolvedValue(null)
 
     const response = await PATCH(
@@ -184,7 +191,7 @@ describe("PATCH /api/items/[id]", () => {
   })
 
   it("returns 500 when update fails unexpectedly", async () => {
-    findFoodItemMock.mockResolvedValue({ id: "item-1" })
+    findFoodItemMock.mockResolvedValue({ id: "item-1", userId: "user-123" })
     findCategoryMock.mockResolvedValue({ id: "cat-1" })
     updateMock.mockRejectedValue(new Error("db error"))
 

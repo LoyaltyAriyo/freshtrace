@@ -24,6 +24,12 @@ vi.mock("@/lib/prisma", () => {
   }
 })
 
+vi.mock("@/lib/auth", () => {
+  return {
+    getCurrentUserId: vi.fn().mockResolvedValue("user-123"),
+  }
+})
+
 import { POST } from "./route"
 // @ts-expect-error - test-only mocked exports
 import { findUniqueMock, updateMock, upsertUsedItemMock, transactionMock } from "@/lib/prisma"
@@ -63,6 +69,7 @@ describe("POST /api/items/[id]/used", () => {
       source: "MANUAL",
       receiptId: null,
       status: "ACTIVE",
+      userId: "user-123",
     })
 
     const response = await POST(new Request("http://localhost/api/items/item-1/used", { method: "POST" }), makeParams("item-1"))
@@ -80,7 +87,7 @@ describe("POST /api/items/[id]/used", () => {
   })
 
   it("returns changed=false when item is already used", async () => {
-    findUniqueMock.mockResolvedValue({ id: "item-1", status: "USED" })
+    findUniqueMock.mockResolvedValue({ id: "item-1", status: "USED", userId: "user-123" })
 
     const response = await POST(new Request("http://localhost/api/items/item-1/used", { method: "POST" }), makeParams("item-1"))
 
@@ -96,7 +103,7 @@ describe("POST /api/items/[id]/used", () => {
   })
 
   it("returns 409 when item status is not ACTIVE", async () => {
-    findUniqueMock.mockResolvedValue({ id: "item-1", status: "WASTED" })
+    findUniqueMock.mockResolvedValue({ id: "item-1", status: "WASTED", userId: "user-123" })
 
     const response = await POST(new Request("http://localhost/api/items/item-1/used", { method: "POST" }), makeParams("item-1"))
 
@@ -114,6 +121,7 @@ describe("POST /api/items/[id]/used", () => {
       source: "MANUAL",
       receiptId: null,
       status: "ACTIVE",
+      userId: "user-123",
     })
     transactionMock.mockRejectedValue(new Error("DB connection lost"))
 

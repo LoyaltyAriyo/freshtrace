@@ -21,6 +21,12 @@ vi.mock("@/lib/supabase/server", () => {
   }
 })
 
+vi.mock("@/lib/auth", () => {
+  return {
+    getCurrentUserId: vi.fn().mockResolvedValue("user-123"),
+  }
+})
+
 vi.mock("@/lib/prisma", () => {
   const createReceiptMock = vi.fn()
   const updateReceiptMock = vi.fn()

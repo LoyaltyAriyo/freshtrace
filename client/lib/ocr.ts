@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer"
+import fs from "node:fs"
 import path from "node:path"
 import { NOISE_PATTERNS, parseFallbackReceiptItems } from "@/lib/fallback-parser"
 
@@ -16,8 +17,52 @@ const TESSERACT_ENABLED =
 	process.env.NEXT_PUBLIC_TESSERACT_ENABLED === "true" ||
 	process.env.TESSERACT_ENABLED === "true"
 
-const TESSERACT_LANG_PATH = process.cwd()
+const DEFAULT_LANG_FILE = "eng.traineddata"
+
+function resolveLangPath() {
+	const cwd = process.cwd()
+
+	const candidates = [
+		cwd,
+		path.join(cwd, ".."),
+	]
+
+	for (const dir of candidates) {
+		try {
+			const candidateFile = path.join(dir, DEFAULT_LANG_FILE)
+			if (fs.existsSync(candidateFile)) {
+				return dir
+			}
+		} catch {
+			// ignore and try next candidate
+		}
+	}
+
+	return cwd
+}
+
+const TESSERACT_LANG_PATH = resolveLangPath()
 const TESSERACT_CACHE_PATH = process.env.VERCEL ? "/tmp" : process.cwd()
+let RESOLVED_WORKER_PATH: string | undefined
+{
+	// Resolve a real filesystem path for the tesseract worker script.
+	const cwd = process.cwd()
+	const candidates = [
+		path.join(cwd, "node_modules/tesseract.js/src/worker-script/node/index.js"),
+		path.join(cwd, "client/node_modules/tesseract.js/src/worker-script/node/index.js"),
+	]
+
+	for (const candidate of candidates) {
+		try {
+			if (fs.existsSync(candidate)) {
+				RESOLVED_WORKER_PATH = candidate
+				break
+			}
+		} catch {
+			// ignore and try next
+		}
+	}
+}
 
 export type OcrDraftItem = {
 	name: string
@@ -99,10 +144,13 @@ export async function extractReceiptDraftItems(imageBytes: Uint8Array): Promise<
 		// Tesseract typings expect an ImageLike (e.g. Buffer), so wrap the
 		// Uint8Array from storage in a Node Buffer for type safety.
 		const input = Buffer.from(imageBytes)
-		const workerOptions = {
+		const workerOptions: Record<string, unknown> = {
 			langPath: TESSERACT_LANG_PATH,
 			cachePath: TESSERACT_CACHE_PATH,
 			gzip: false,
+		}
+		if (RESOLVED_WORKER_PATH) {
+			workerOptions.workerPath = RESOLVED_WORKER_PATH
 		}
 		const worker = await tesseract.createWorker("eng", 1, workerOptions)
 		const result = await worker.recognize(input)

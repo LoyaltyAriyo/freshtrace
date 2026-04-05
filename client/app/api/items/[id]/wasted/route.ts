@@ -1,12 +1,19 @@
 import { prisma } from "@/lib/prisma"
+import { getCurrentUserId } from "@/lib/auth"
 
 type Params = { params: Promise<{ id: string }> }
 
-export async function POST(_request: Request, { params }: Params) {
+export async function POST(request: Request, { params }: Params) {
 	const { id } = await params
 
 	if (!id) {
 		return Response.json({ error: "Item ID is required." }, { status: 400 })
+	}
+
+	const userId = await getCurrentUserId(request)
+
+	if (!userId) {
+		return Response.json({ error: "You must be signed in to update items." }, { status: 401 })
 	}
 
 	const existing = await prisma.foodItem.findUnique({
@@ -19,10 +26,11 @@ export async function POST(_request: Request, { params }: Params) {
 			source: true,
 			receiptId: true,
 			status: true,
+			userId: true,
 		},
 	})
 
-	if (!existing) {
+	if (!existing || existing.userId !== userId) {
 		return Response.json({ error: "Item not found." }, { status: 404 })
 	}
 
