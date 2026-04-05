@@ -59,6 +59,7 @@ describe("FoodListPage success confirmation", () => {
             id: "item-1",
             name: "Banana",
             quantity: 4,
+            categoryId: "cat-produce",
             categoryName: "Produce",
             dateAdded: "2026-03-22T00:00:00.000Z",
             priority: "use-soon",
@@ -87,6 +88,7 @@ describe("FoodListPage success confirmation", () => {
             id: "item-1",
             name: "Milk",
             quantity: 1,
+            categoryId: "cat-dairy",
             categoryName: "Dairy",
             dateAdded: "2026-03-22T00:00:00.000Z",
             priority: "use-soon",
@@ -132,6 +134,7 @@ describe("FoodListPage success confirmation", () => {
             id: "item-2",
             name: "Bread",
             quantity: 1,
+            categoryId: "cat-pantry",
             categoryName: "Pantry",
             dateAdded: "2026-03-22T00:00:00.000Z",
             priority: "use-later",
@@ -162,5 +165,119 @@ describe("FoodListPage success confirmation", () => {
     })
 
     expect(await screen.findByText("No items found")).toBeInTheDocument()
+  })
+
+  it("shows a success message after editing an item", async () => {
+    getSearchParamMock.mockReturnValue(null)
+
+    const updatedRow = {
+      id: "item-1",
+      name: "Banana",
+      quantity: 4,
+      categoryId: "cat-produce",
+      categoryName: "Produce",
+      dateAdded: "2026-03-22T00:00:00.000Z",
+      priority: "use-soon" as const,
+    }
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([updatedRow]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([{ id: "cat-produce", name: "Produce" }]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          id: "item-1",
+          name: "Banana",
+          quantity: 4,
+          categoryId: "cat-produce",
+          category: { name: "Produce" },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([updatedRow]),
+      })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<FoodListPage />)
+
+    expect(await screen.findByText("Banana")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
+
+    const success = await screen.findByTestId("edit-item-success")
+    expect(success).toHaveTextContent("Changes saved")
+    expect(success).toHaveTextContent("Banana")
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/items/item-1",
+        expect.objectContaining({
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+    })
+  })
+
+  it("shows an error message when saving edits fails", async () => {
+    getSearchParamMock.mockReturnValue(null)
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            id: "item-1",
+            name: "Milk",
+            quantity: 1,
+            categoryId: "cat-dairy",
+            categoryName: "Dairy",
+            dateAdded: "2026-03-22T00:00:00.000Z",
+            priority: "use-soon",
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([{ id: "cat-dairy", name: "Dairy" }]),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: vi.fn().mockResolvedValue({ error: "Item name is required." }),
+      })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<FoodListPage />)
+
+    expect(await screen.findByText("Milk")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
+
+    const errorAlert = await screen.findByTestId("edit-item-error")
+    expect(errorAlert).toHaveTextContent("Could not save changes")
+    expect(errorAlert).toHaveTextContent("Item name is required.")
   })
 })

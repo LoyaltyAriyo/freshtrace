@@ -38,7 +38,7 @@ describe("GET /api/items", () => {
         quantity: 2,
         dateAdded: new Date("2026-03-20T00:00:00.000Z"),
         status: "ACTIVE",
-        category: { name: "Dairy" },
+        category: { id: "cat-dairy", name: "Dairy" },
       },
     ])
 
@@ -52,6 +52,7 @@ describe("GET /api/items", () => {
       id: "item-1",
       name: "Milk",
       quantity: 2,
+      categoryId: "cat-dairy",
       categoryName: "Dairy",
       status: "ACTIVE",
     })

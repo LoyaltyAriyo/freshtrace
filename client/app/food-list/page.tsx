@@ -5,11 +5,24 @@ import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { CategoryDropdown } from "@/components/category-dropdown"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 type FoodListItem = {
   id: string
   name: string
   quantity: number
+  categoryId: string
   categoryName: string
   dateAdded: string
   priority: "use-first" | "use-soon" | "use-later"
@@ -28,6 +41,17 @@ function FoodListPageContent() {
   const [error, setError] = useState("")
   const [actionError, setActionError] = useState("")
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null)
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editQuantity, setEditQuantity] = useState(1)
+  const [editCategoryId, setEditCategoryId] = useState("")
+  const [editSaving, setEditSaving] = useState(false)
+  const [editFeedback, setEditFeedback] = useState<{
+    type: "success" | "error"
+    message: string
+  } | null>(null)
 
   async function loadItems() {
     setLoading(true)
@@ -61,6 +85,7 @@ function FoodListPageContent() {
               typeof item.quantity === "number" && Number.isFinite(item.quantity)
                 ? Math.max(1, Math.floor(item.quantity))
                 : 1,
+            categoryId: typeof item.categoryId === "string" ? item.categoryId : "",
             categoryName:
               typeof item.categoryName === "string" && item.categoryName.trim()
                 ? item.categoryName
@@ -149,6 +174,65 @@ function FoodListPageContent() {
     await updateItemStatus(id, "wasted")
   }
 
+  function openEdit(item: FoodListItem) {
+    setEditFeedback(null)
+    setActionError("")
+    setEditingItemId(item.id)
+    setEditName(item.name)
+    setEditQuantity(item.quantity)
+    setEditCategoryId(item.categoryId)
+    setEditOpen(true)
+  }
+
+  async function saveEditedItem() {
+    if (!editingItemId) return
+
+    setEditSaving(true)
+    setEditFeedback(null)
+
+    try {
+      const response = await fetch(`/api/items/${editingItemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName,
+          quantity: editQuantity,
+          categoryId: editCategoryId,
+        }),
+      })
+
+      const data = (await response.json().catch(() => null)) as { error?: string; name?: string } | null
+
+      if (!response.ok) {
+        setEditFeedback({
+          type: "error",
+          message: data?.error || "Failed to update item.",
+        })
+        return
+      }
+
+      const displayName = typeof data?.name === "string" && data.name.trim() ? data.name : editName.trim()
+
+      setEditOpen(false)
+      setEditingItemId(null)
+      setEditFeedback({
+        type: "success",
+        message:
+          displayName.length > 0
+            ? `"${displayName}" was updated successfully.`
+            : "Item was updated successfully.",
+      })
+      await loadItems()
+    } catch {
+      setEditFeedback({
+        type: "error",
+        message: "Failed to update item. Please try again.",
+      })
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
   function formatDate(value: string) {
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return "Unknown"
@@ -185,6 +269,20 @@ function FoodListPageContent() {
         </Alert>
       )}
 
+      {editFeedback?.type === "success" && (
+        <Alert data-testid="edit-item-success">
+          <AlertTitle>Changes saved</AlertTitle>
+          <AlertDescription>{editFeedback.message}</AlertDescription>
+        </Alert>
+      )}
+
+      {editFeedback?.type === "error" && (
+        <Alert variant="destructive" data-testid="edit-item-error">
+          <AlertTitle>Could not save changes</AlertTitle>
+          <AlertDescription>{editFeedback.message}</AlertDescription>
+        </Alert>
+      )}
+
       {loading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="items-loading">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -205,6 +303,15 @@ function FoodListPageContent() {
               <span className={`rounded-full px-3 py-1 text-xs font-medium ${priorityStyles[item.priority]}`}>
                 {item.priority === "use-first" ? "Use First" : item.priority === "use-soon" ? "Use Soon" : "Use Later"}
               </span>
+              <button
+                type="button"
+                onClick={() => openEdit(item)}
+                aria-label="Edit"
+                disabled={updatingItemId === item.id}
+                className="rounded-md border px-3 py-1 text-xs hover:bg-muted"
+              >
+                Edit
+              </button>
               <button
                 onClick={() => markUsed(item.id)}
                 aria-label="Used"
@@ -232,6 +339,64 @@ function FoodListPageContent() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open)
+          if (!open) {
+            setEditingItemId(null)
+            setEditSaving(false)
+            setEditFeedback((prev) => (prev?.type === "error" ? null : prev))
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit item</DialogTitle>
+            <DialogDescription>Update the name, quantity, or category, then save your changes.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="edit-item-name">Name</Label>
+              <Input
+                id="edit-item-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                disabled={editSaving}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="edit-item-quantity">Quantity</Label>
+              <Input
+                id="edit-item-quantity"
+                type="number"
+                min={1}
+                value={editQuantity}
+                onChange={(e) => setEditQuantity(Math.max(1, Number(e.target.value)))}
+                disabled={editSaving}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label>Category</Label>
+              <CategoryDropdown
+                value={editCategoryId}
+                onValueChange={setEditCategoryId}
+                disabled={editSaving}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void saveEditedItem()} disabled={editSaving}>
+              {editSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
