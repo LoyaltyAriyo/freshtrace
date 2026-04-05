@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -34,6 +35,11 @@ export default function AdminOverviewPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Admin Overview</h1>
           <p className="mt-1 text-sm text-muted-foreground">System-level dashboard (read-only)</p>
+          <p className="mt-2">
+            <Link href="/admin/users" className="text-sm font-medium text-primary hover:underline">
+              View users
+            </Link>
+          </p>
         </div>
         <Select value={range} onValueChange={setRange}>
           <SelectTrigger className="w-40">

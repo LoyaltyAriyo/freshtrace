@@ -5,7 +5,7 @@ import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { Home, ScanLine, UtensilsCrossed, User } from "lucide-react"
+import { Home, LayoutDashboard, ScanLine, UtensilsCrossed, User, Users } from "lucide-react"
 
 const userNav = [
   { href: "/", label: "Home", icon: Home },
@@ -14,10 +14,27 @@ const userNav = [
   { href: "/manual-entry", label: "Manual Entry", icon: User },
 ]
 
-export function AppNav() {
+const adminNav = [
+  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/users", label: "Users", icon: Users },
+]
+
+type AppNavProps = {
+  variant?: "default" | "admin"
+}
+
+export function AppNav({ variant = "default" }: AppNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
+
+  const navItems = variant === "admin" ? adminNav : userNav
+
+  function isNavActive(href: string) {
+    if (href === "/") return pathname === href
+    if (href === "/admin") return pathname === "/admin"
+    return pathname === href || pathname.startsWith(`${href}/`)
+  }
 
   async function handleSignOut() {
     if (signingOut) return
@@ -51,9 +68,8 @@ export function AppNav() {
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
-            {userNav.map((item) => {
-              const isActive =
-                item.href === "/" ? pathname === item.href : pathname.startsWith(item.href)
+            {navItems.map((item) => {
+              const isActive = isNavActive(item.href)
 
               return (
                 <Link
@@ -92,9 +108,8 @@ export function AppNav() {
         aria-label="Main navigation"
       >
         <div className="mx-auto flex h-16 max-w-lg items-center justify-around px-2">
-          {userNav.map((item) => {
-            const isActive =
-              item.href === "/" ? pathname === item.href : pathname.startsWith(item.href)
+          {navItems.map((item) => {
+            const isActive = isNavActive(item.href)
 
             return (
               <Link
