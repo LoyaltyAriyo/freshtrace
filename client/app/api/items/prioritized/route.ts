@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getCurrentUserId } from "@/lib/auth"
 
 type ItemPriority = "use-first" | "use-soon" | "use-later"
 type CategoryKey = "produce" | "dairy" | "meat" | "leftovers" | "pantry" | "other"
@@ -48,11 +49,21 @@ function toCategoryKey(value: string): CategoryKey {
   return "other"
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const userId = await getCurrentUserId(request)
+
+    if (!userId) {
+      return Response.json(
+        { error: "You must be signed in to view prioritized items." },
+        { status: 401 }
+      )
+    }
+
     const items = (await prisma.foodItem.findMany({
       where: {
         status: "ACTIVE",
+        userId,
       },
       orderBy: {
         dateAdded: "desc",

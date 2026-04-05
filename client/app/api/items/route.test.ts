@@ -21,6 +21,12 @@ vi.mock("@/lib/prisma", () => {
   }
 })
 
+vi.mock("@/lib/auth", () => {
+  return {
+    getCurrentUserId: vi.fn().mockResolvedValue("user-123"),
+  }
+})
+
 import { GET, POST } from "./route"
 // @ts-expect-error - test-only mocked exports
 import { findManyMock, findUniqueMock, createMock } from "@/lib/prisma"
@@ -42,7 +48,7 @@ describe("GET /api/items", () => {
       },
     ])
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/items"))
 
     expect(response.status).toBe(200)
     const body = await response.json()
@@ -60,11 +66,11 @@ describe("GET /api/items", () => {
   it("queries only ACTIVE items from Prisma", async () => {
     findManyMock.mockResolvedValue([])
 
-    await GET()
+    await GET(new Request("http://localhost/api/items"))
 
     expect(findManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { status: "ACTIVE" },
+        where: { status: "ACTIVE", userId: "user-123" },
       }),
     )
   })
@@ -72,7 +78,7 @@ describe("GET /api/items", () => {
   it("returns 500 when loading items fails", async () => {
     findManyMock.mockRejectedValue(new Error("db down"))
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/items"))
 
     expect(response.status).toBe(500)
     const body = await response.json()

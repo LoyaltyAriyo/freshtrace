@@ -32,6 +32,12 @@ vi.mock("@/lib/prisma", () => {
   }
 })
 
+vi.mock("@/lib/auth", () => {
+  return {
+    getCurrentUserId: vi.fn().mockResolvedValue("user-123"),
+  }
+})
+
 import { GET as getActiveItems } from "./route"
 import { POST as markItemUsed } from "./[id]/used/route"
 import { POST as markItemWasted } from "./[id]/wasted/route"
@@ -68,6 +74,7 @@ describe("Food item status updates (USED/WASTED)", () => {
       source: "MANUAL",
       receiptId: null,
       status: "ACTIVE",
+      userId: "user-123",
     })
 
     updateMock.mockResolvedValue({
@@ -108,6 +115,7 @@ describe("Food item status updates (USED/WASTED)", () => {
       source: "RECEIPT",
       receiptId: "receipt-1",
       status: "ACTIVE",
+      userId: "user-123",
     })
 
     updateMock.mockResolvedValue({
@@ -170,6 +178,7 @@ describe("Food item status updates (USED/WASTED)", () => {
     findUniqueMock.mockResolvedValue({
       id: "item-used-2",
       status: "USED",
+      userId: "user-123",
     })
 
     const response = await markItemUsed(
@@ -194,6 +203,7 @@ describe("Food item status updates (USED/WASTED)", () => {
     findUniqueMock.mockResolvedValue({
       id: "item-wasted-2",
       status: "WASTED",
+      userId: "user-123",
     })
 
     const response = await markItemWasted(
@@ -223,6 +233,7 @@ describe("Food item status updates (USED/WASTED)", () => {
       source: "MANUAL",
       receiptId: null,
       status: "ACTIVE",
+      userId: "user-123",
     })
 
     updateMock.mockResolvedValue({
@@ -248,16 +259,17 @@ describe("Food item status updates (USED/WASTED)", () => {
       },
     ])
 
-    const response = await getActiveItems()
+    const response = await getActiveItems(
+      new Request("http://localhost/api/items"),
+    )
 
     expect(response.status).toBe(200)
     await response.json()
 
     expect(findManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { status: "ACTIVE" },
+        where: { status: "ACTIVE", userId: "user-123" },
       }),
     )
   })
 })
-
