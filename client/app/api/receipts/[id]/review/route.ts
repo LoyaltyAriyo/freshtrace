@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { ensureCategories } from "@/lib/category-utils"
+import { getCurrentUserId } from "@/lib/auth"
 
 type Params = { params: Promise<{ id: string }> }
 type EditedItemInput = {
@@ -32,8 +33,17 @@ type ReviewCategoryId = {
   id: string
 }
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   const { id } = await params
+
+  const userId = await getCurrentUserId(request)
+
+  if (!userId) {
+    return Response.json(
+      { error: "You must be signed in to review receipts." },
+      { status: 401 }
+    )
+  }
 
   const receipt = await prisma.receipt.findUnique({
     where: { id },
@@ -41,6 +51,7 @@ export async function GET(_request: Request, { params }: Params) {
       id: true,
       ocrStatus: true,
       imagePath: true,
+      userId: true,
       draftItems: {
         select: {
           id: true,
@@ -54,7 +65,7 @@ export async function GET(_request: Request, { params }: Params) {
     },
   })
 
-  if (!receipt) {
+  if (!receipt || receipt.userId !== userId) {
     return Response.json({ error: "Receipt not found." }, { status: 404 })
   }
 
@@ -71,6 +82,15 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   const { id } = await params
+
+  const userId = await getCurrentUserId(request)
+
+  if (!userId) {
+    return Response.json(
+      { error: "You must be signed in to save items from a receipt." },
+      { status: 401 }
+    )
+  }
 
   let body: unknown
   try {
@@ -220,6 +240,7 @@ export async function POST(request: Request, { params }: Params) {
     where: { id },
     select: {
       id: true,
+      userId: true,
       draftItems: {
         select: {
           id: true,
@@ -232,7 +253,7 @@ export async function POST(request: Request, { params }: Params) {
     },
   })
 
-  if (!receipt) {
+  if (!receipt || receipt.userId !== userId) {
     return Response.json({ error: "Receipt not found." }, { status: 404 })
   }
 
@@ -317,6 +338,7 @@ export async function POST(request: Request, { params }: Params) {
         categoryId: item.categoryId as string,
         source: "RECEIPT" as const,
         receiptId: receipt.id,
+        userId,
       })),
     })
 

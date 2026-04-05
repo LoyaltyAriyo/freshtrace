@@ -27,6 +27,12 @@ vi.mock("@/lib/prisma", () => {
   }
 })
 
+vi.mock("@/lib/auth", () => {
+  return {
+    getCurrentUserId: vi.fn().mockResolvedValue("user-123"),
+  }
+})
+
 import { POST as markItemWasted } from "./[id]/wasted/route"
 import { GET as getActiveItems } from "./route"
 // @ts-expect-error - test-only mocked exports
@@ -60,6 +66,7 @@ describe("Wasted items workflow", () => {
       source: "RECEIPT",
       receiptId: "receipt-1",
       status: "ACTIVE",
+      userId: "user-123",
     })
 
     updateMock.mockResolvedValue({
@@ -129,6 +136,7 @@ describe("Wasted items workflow", () => {
     findUniqueMock.mockResolvedValue({
       id: "item-waste-2",
       status: "WASTED",
+      userId: "user-123",
     })
 
     const response = await markItemWasted(
@@ -158,6 +166,7 @@ describe("Wasted items workflow", () => {
       source: "MANUAL",
       receiptId: null,
       status: "ACTIVE",
+      userId: "user-123",
     })
 
     updateMock.mockResolvedValue({
@@ -193,6 +202,7 @@ describe("Wasted items workflow", () => {
       source: "MANUAL",
       receiptId: null,
       status: "ACTIVE",
+      userId: "user-123",
     })
 
     updateMock.mockResolvedValue({
@@ -219,7 +229,9 @@ describe("Wasted items workflow", () => {
       },
     ])
 
-    const response = await getActiveItems()
+    const response = await getActiveItems(
+      new Request("http://localhost/api/items"),
+    )
 
     expect(response.status).toBe(200)
     const body = await response.json()
@@ -228,9 +240,8 @@ describe("Wasted items workflow", () => {
     expect(body.some((item: { id: string }) => item.id === "item-waste-4")).toBe(false)
     expect(findManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { status: "ACTIVE" },
+        where: { status: "ACTIVE", userId: "user-123" },
       }),
     )
   })
 })
-

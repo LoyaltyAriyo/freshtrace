@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { getCurrentUserId } from "@/lib/auth"
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -16,9 +17,15 @@ function isNotFoundPrismaError(
   )
 }
 
-export async function GET(_: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   try {
     const { id } = await context.params
+
+    const userId = await getCurrentUserId(request)
+
+    if (!userId) {
+      return NextResponse.json({ error: "You must be signed in to view this item." }, { status: 401 })
+    }
 
     const item = await prisma.foodItem.findUnique({
       where: { id },
@@ -27,7 +34,7 @@ export async function GET(_: Request, context: RouteContext) {
       },
     })
 
-    if (!item) {
+    if (!item || item.userId !== userId) {
       return NextResponse.json({ error: "Item not found." }, { status: 404 })
     }
 
@@ -70,12 +77,18 @@ export async function PATCH(request: Request, context: RouteContext) {
       )
     }
 
+    const userId = await getCurrentUserId(request)
+
+    if (!userId) {
+      return NextResponse.json({ error: "You must be signed in to update items." }, { status: 401 })
+    }
+
     const existing = await prisma.foodItem.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, userId: true },
     })
 
-    if (!existing) {
+    if (!existing || existing.userId !== userId) {
       return NextResponse.json({ error: "Item not found." }, { status: 404 })
     }
 
