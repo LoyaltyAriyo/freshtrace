@@ -27,6 +27,26 @@ enum FoodItemSource {
   MANUAL
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id            String         @id
+  email         String         @unique
+  fullName      String
+  role          UserRole       @default(USER)
+  accountStatus AccountStatus  @default(ACTIVE)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
 model Category {
   id            String            @id @default(cuid())
   name          String            @unique
