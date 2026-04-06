@@ -104,7 +104,6 @@ export function AppNav({ variant = "default" }: AppNavProps) {
 
       <nav
         className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md md:hidden"
-        role="tablist"
         aria-label="Main navigation"
       >
         <div className="mx-auto flex h-16 max-w-lg items-center justify-around px-2">
@@ -115,8 +114,7 @@ export function AppNav({ variant = "default" }: AppNavProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                role="tab"
-                aria-selected={isActive}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 transition-colors",
                   isActive ? "text-primary" : "text-muted-foreground"
