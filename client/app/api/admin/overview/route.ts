@@ -1,46 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
-
-type AllowedRange = "today" | "7d" | "30d"
-
-type AdminOverviewSummary = {
-  totalHouseholds: number
-  activeUsers: number
-  activeFoodItems: number
-  receiptUploads: number
-}
-
-type AdminOverviewResponse = {
-  range: AllowedRange
-  summary: AdminOverviewSummary
-  generatedAt: string
-}
-
-function resolveRange(param: string | null): { range: AllowedRange; startDate: Date } {
-  const normalized = (param ?? "").toLowerCase()
-
-  let range: AllowedRange = "7d"
-
-  if (normalized === "today" || normalized === "7d" || normalized === "30d") {
-    range = normalized
-  }
-
-  const now = new Date()
-
-  if (range === "today") {
-    const startOfDay = new Date(now)
-    startOfDay.setHours(0, 0, 0, 0)
-    return { range, startDate: startOfDay }
-  }
-
-  const days =
-    range === "30d"
-      ? 30
-      : 7
-
-  const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-  return { range, startDate }
-}
+import { getOverviewMetrics, parseTimeRange } from "@/lib/queries/overview-metrics"
 
 export async function GET(request: Request) {
   try {
@@ -73,42 +33,14 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const rawRange = searchParams.get("range")
-    const { range, startDate } = resolveRange(rawRange)
+    const range = parseTimeRange(searchParams.get("range"))
+    const metrics = await getOverviewMetrics(range)
 
-    const [activeUsers, activeFoodItems, receiptUploads] = await Promise.all([
-      prisma.user.count({
-        where: {
-          accountStatus: "ACTIVE",
-        },
-      }),
-      prisma.foodItem.count({
-        where: {
-          status: "ACTIVE",
-        },
-      }),
-      prisma.receipt.count({
-        where: {
-          uploadedAt: {
-            gte: startDate,
-          },
-        },
-      }),
-    ])
-
-    const payload: AdminOverviewResponse = {
+    return Response.json({
       range,
-      summary: {
-        // Household persistence is not implemented yet; this is intentionally a placeholder.
-        totalHouseholds: 0,
-        activeUsers,
-        activeFoodItems,
-        receiptUploads,
-      },
+      summary: metrics,
       generatedAt: new Date().toISOString(),
-    }
-
-    return Response.json(payload)
+    })
   } catch (error) {
     console.error("Failed to load admin overview data:", error)
     return Response.json(
