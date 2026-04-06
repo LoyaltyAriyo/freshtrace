@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
 import { getOverviewMetrics, parseTimeRange } from "@/lib/queries/overview-metrics"
+import { getExtendedMetrics } from "@/lib/queries/extended-metrics"
 
 export async function GET(request: Request) {
   try {
@@ -34,11 +35,24 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const range = parseTimeRange(searchParams.get("range"))
+    const detailed = searchParams.get("detailed") === "true"
+
     const metrics = await getOverviewMetrics(range)
+
+    if (!detailed) {
+      return Response.json({
+        range,
+        summary: metrics,
+        generatedAt: new Date().toISOString(),
+      })
+    }
+
+    const extended = await getExtendedMetrics(range)
 
     return Response.json({
       range,
       summary: metrics,
+      ...extended,
       generatedAt: new Date().toISOString(),
     })
   } catch (error) {
