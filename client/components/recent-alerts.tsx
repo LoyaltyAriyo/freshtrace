@@ -1,10 +1,12 @@
 "use client"
 
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Alert } from "@/lib/data"
 import { formatRelativeTime } from "@/lib/data"
 import { cn } from "@/lib/utils"
-import { Bell, AlertTriangle, Info } from "lucide-react"
+import { Bell, AlertTriangle, Info, X } from "lucide-react"
 
 const alertIcons = {
   reminder: Bell,
@@ -19,7 +21,12 @@ const alertStyles = {
 }
 
 export function RecentAlerts({ alerts }: { alerts: Alert[] }) {
-  const recent = alerts.slice(0, 4)
+  const [visibleAlerts, setVisibleAlerts] = useState<Alert[]>(alerts)
+  const recent = visibleAlerts.slice(0, 4)
+
+  function dismissAlert(id: string) {
+    setVisibleAlerts((prev) => prev.filter((alert) => alert.id !== id))
+  }
 
   return (
     <Card>
@@ -29,6 +36,7 @@ export function RecentAlerts({ alerts }: { alerts: Alert[] }) {
           Recent Alerts
         </CardTitle>
       </CardHeader>
+
       <CardContent>
         {recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">No recent alerts</p>
@@ -36,6 +44,7 @@ export function RecentAlerts({ alerts }: { alerts: Alert[] }) {
           <div className="flex flex-col gap-3">
             {recent.map((alert) => {
               const Icon = alertIcons[alert.type]
+
               return (
                 <div
                   key={alert.id}
@@ -45,15 +54,30 @@ export function RecentAlerts({ alerts }: { alerts: Alert[] }) {
                   )}
                 >
                   <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", alertStyles[alert.type])} />
+
                   <div className="flex-1">
-                    <p className="text-sm text-foreground leading-relaxed">{alert.message}</p>
+                    <p className="text-sm leading-relaxed text-foreground">{alert.message}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {formatRelativeTime(alert.timestamp)}
                     </p>
                   </div>
-                  {!alert.read && (
-                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
-                  )}
+
+                  <div className="flex items-start gap-2">
+                    {!alert.read && (
+                      <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                    )}
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => dismissAlert(alert.id)}
+                      aria-label={`Dismiss alert: ${alert.message}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               )
             })}
@@ -62,4 +86,4 @@ export function RecentAlerts({ alerts }: { alerts: Alert[] }) {
       </CardContent>
     </Card>
   )
-} 
+}
