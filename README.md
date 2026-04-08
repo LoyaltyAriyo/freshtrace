@@ -1,61 +1,121 @@
-# T5-W26-COMP231
+# T5-W26-COMP231 / Fresh Trace
+
+Fresh Trace is a food tracking and waste reduction application developed for COMP231 using Agile Scrum.
+
+---
 
 ## Project Structure
 
-- `client/` – Next.js frontend application (app router, components, types).
-- `server/` – Backend code and Prisma (`server/prisma`).
+- `client/` – Next.js frontend application (App Router, components, types, Prisma schema + client).
+- `server/` – Backend utilities and Prisma schema/client used by scripts (`server/prisma`, `server/scripts`).
 
-Test Bed Setup (How to Run the Project)
+---
 
-Follow these steps to run the Fresh Trace application locally.
+## Getting Started (first setup on your machine)
 
-1. Clone the repository
+1. **Clone the repository**
+
+```bash
 git clone https://github.com/T5-W26-COMP231/T5-W26-COMP231.git
 cd T5-W26-COMP231
-2. Install dependencies
-cd client
-npm install
-3. Set up the database (Prisma, PostgreSQL)
+```
 
-Make sure you are inside the `client` folder.
-
-- Generate the Prisma client (PostgreSQL)
+2. **Install frontend dependencies**
 
 ```bash
 cd client
+npm install
+```
+
+3. **Configure environment variables**
+
+Make sure `DATABASE_URL` and `DIRECT_URL` for the shared Supabase Postgres instance are available to your shell.  
+The repo includes example values in `.env` files; update them as needed for your environment.
+
+On macOS / Linux, from inside `client/` you can export them like this:
+
+```bash
+cd client
+set -a
+source .env
+set +a
+```
+
+4. **Set up the database (Prisma + PostgreSQL)**
+
+Still inside `client/`:
+
+```bash
+# Generate Prisma Client for the app
 npm run prisma:generate
-```
 
-- Create or update the PostgreSQL schema
-
-```bash
+# Create or update the PostgreSQL schema
 npm run prisma:push
-```
 
-- Seed default categories (Produce, Dairy, Meat, etc.)
-
-```bash
+# Seed default categories (Produce, Dairy, Meat, etc.)
 npm run prisma:seed
 ```
 
 This will:
 
 - generate the Prisma client targeting PostgreSQL
-- create or update the PostgreSQL schema using `DATABASE_URL`
+- create or update the PostgreSQL schema using `DATABASE_URL` / `DIRECT_URL`
 - seed default categories (Produce, Dairy, Meat, etc.)
-4. Run the application
 
-From the root (recommended):
+5. **Run the application**
 
+From the **repo root** (recommended):
+
+```bash
 npm run dev
+```
 
-Or from the client folder:
+Or from the `client` folder:
 
+```bash
 cd client
 npm run dev
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+```
+
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
 You can start editing the main page by modifying `client/app/page.tsx`. The page auto-updates as you edit the file.
+
+---
+
+## After Pulling New Schema Changes (Prisma regeneration)
+
+Whenever someone commits Prisma schema changes (for example new models like `Notification`), **each developer must resync Prisma** so it works in their own environment.
+
+From the repo root:
+
+```bash
+cd client
+
+# Ensure DATABASE_URL and DIRECT_URL are in your shell env
+set -a
+source .env   # or ../.env if you prefer using the root file
+set +a
+
+# Regenerate Prisma client & sync schema to your Postgres
+npm run prisma:generate
+npm run prisma:push
+
+# Optional but recommended to keep defaults in sync
+npm run prisma:seed
+```
+
+Notes:
+
+- Prisma CLI detects `prisma.config.ts` and **does not auto-load `.env` files**, so having `.env` present is not enough — the relevant variables must be in your shell environment before running Prisma commands.
+- If you use a different method to set environment variables (e.g. your shell profile, VS Code tasks, or a secrets manager), you can skip the `set -a / source / set +a` lines as long as `DATABASE_URL` and `DIRECT_URL` are set for the `npm run prisma:*` processes.
+
+For the backend utility scripts under `server/`, Prisma Client is generated to `server/generated/client`. If the server Prisma schema (`server/prisma/schema.prisma`) is changed in the future, regenerate that client with:
+
+```bash
+cd server/prisma
+npx prisma generate --schema schema.prisma
+```
 
 ## Prisma / PostgreSQL migration note
 

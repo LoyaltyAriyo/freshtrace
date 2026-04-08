@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import HomePage from "@/app/page"
 
 // Mock child components
@@ -52,17 +52,17 @@ describe("HomePage - Overview Data & UI", () => {
     await waitFor(() => {
       expect(screen.getByText(/2 active items/i)).toBeInTheDocument()
 
-      expect(screen.getByText("Total Items")).toBeInTheDocument()
-      expect(screen.getByText("2")).toBeInTheDocument()
+      const totalCard = screen.getByText("Total Items").closest("div") as HTMLElement
+      expect(within(totalCard).getByText("2")).toBeInTheDocument()
 
-      expect(screen.getByText("Use First")).toBeInTheDocument()
-      expect(screen.getByText("1")).toBeInTheDocument()
+      const useFirstCard = screen.getByText("Use First").closest("div") as HTMLElement
+      expect(within(useFirstCard).getByText("1")).toBeInTheDocument()
 
-      expect(screen.getByText("Use Soon")).toBeInTheDocument()
-      expect(screen.getByText("1")).toBeInTheDocument()
+      const useSoonCard = screen.getByText("Use Soon").closest("div") as HTMLElement
+      expect(within(useSoonCard).getByText("1")).toBeInTheDocument()
 
-      expect(screen.getByText("Use Later")).toBeInTheDocument()
-      expect(screen.getByText("0")).toBeInTheDocument()
+      const useLaterCard = screen.getByText("Use Later").closest("div") as HTMLElement
+      expect(within(useLaterCard).getByText("0")).toBeInTheDocument()
     })
   })
 

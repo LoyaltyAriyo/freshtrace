@@ -1,4 +1,3 @@
-import "@testing-library/jest-dom"
 import { defineConfig } from "vitest/config"
 import path from "path"
 
@@ -11,6 +10,6 @@ export default defineConfig({
   test: {
     environment: "jsdom",   // ✅ FIXED
     globals: true,
-    setupFiles: "./setupTests.ts",  // ✅ FIXED NAME
+    setupFiles: "./vitest.setup.ts",
   },
 })

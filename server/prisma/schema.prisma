@@ -37,6 +37,12 @@ enum AccountStatus {
   DISABLED
 }
 
+enum NotificationType {
+  REMINDER
+  WARNING
+  INFO
+}
+
 model User {
   id            String         @id
   email         String         @unique
@@ -48,6 +54,7 @@ model User {
 
   receipts      Receipt[]
   foodItems     FoodItem[]
+  notifications Notification[]
 }
 
 model Category {
@@ -117,6 +124,8 @@ model FoodItem {
 
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
+
+  notifications Notification[]
 }
 
 model UsedItem {
@@ -157,4 +166,20 @@ model WastedItem {
 
   markedWastedAt  DateTime       @default(now())
   createdAt       DateTime       @default(now())
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  foodItemId  String?
+  foodItem    FoodItem?        @relation(fields: [foodItemId], references: [id], onDelete: SetNull)
+
+  message     String
+  type        NotificationType @default(INFO)
+  isRead      Boolean          @default(false)
+
+  createdAt   DateTime         @default(now())
 }
