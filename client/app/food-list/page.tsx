@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useId, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
@@ -89,6 +89,35 @@ function FoodListPageContent() {
     type: "success" | "error"
     message: string
   } | null>(null)
+  const [editDialogError, setEditDialogError] = useState("")
+
+  // Auto-dismiss page-level success feedback after 5 seconds
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const setEditFeedbackWithAutoDismiss = useCallback(
+    (fb: { type: "success" | "error"; message: string } | null) => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current)
+        feedbackTimerRef.current = null
+      }
+      setEditFeedback(fb)
+      if (fb?.type === "success") {
+        feedbackTimerRef.current = setTimeout(() => {
+          setEditFeedback((prev) => (prev?.type === "success" ? null : prev))
+          feedbackTimerRef.current = null
+        }, 5000)
+      }
+    },
+    [],
+  )
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current)
+      }
+    }
+  }, [])
 
   async function loadItems() {
     setLoading(true)
@@ -212,7 +241,8 @@ function FoodListPageContent() {
   }
 
   function openEdit(item: FoodListItem) {
-    setEditFeedback(null)
+    setEditFeedbackWithAutoDismiss(null)
+    setEditDialogError("")
     setActionError("")
     setEditFieldErrors({})
     setEditingItemId(item.id)
@@ -225,7 +255,7 @@ function FoodListPageContent() {
   async function saveEditedItem() {
     if (!editingItemId) return
 
-    setEditFeedback(null)
+    setEditDialogError("")
 
     const validation = validateEditedItemInput(editName, editQuantityInput, editCategoryId)
     if (validation) {
@@ -253,10 +283,8 @@ function FoodListPageContent() {
       const data = (await response.json().catch(() => null)) as { error?: string; name?: string } | null
 
       if (!response.ok) {
-        setEditFeedback({
-          type: "error",
-          message: data?.error || "Failed to update item.",
-        })
+        // Keep the dialog open so the user can fix the issue
+        setEditDialogError(data?.error || "Failed to update item. Please try again.")
         return
       }
 
@@ -264,7 +292,7 @@ function FoodListPageContent() {
 
       setEditOpen(false)
       setEditingItemId(null)
-      setEditFeedback({
+      setEditFeedbackWithAutoDismiss({
         type: "success",
         message:
           displayName.length > 0
@@ -273,10 +301,8 @@ function FoodListPageContent() {
       })
       await loadItems()
     } catch {
-      setEditFeedback({
-        type: "error",
-        message: "Failed to update item. Please try again.",
-      })
+      // Network / unexpected error — keep dialog open
+      setEditDialogError("Unable to reach the server. Please check your connection and try again.")
     } finally {
       setEditSaving(false)
     }
@@ -321,13 +347,6 @@ function FoodListPageContent() {
       {editFeedback?.type === "success" && (
         <Alert data-testid="edit-item-success">
           <AlertTitle>Changes saved</AlertTitle>
-          <AlertDescription>{editFeedback.message}</AlertDescription>
-        </Alert>
-      )}
-
-      {editFeedback?.type === "error" && (
-        <Alert variant="destructive" data-testid="edit-item-error">
-          <AlertTitle>Could not save changes</AlertTitle>
           <AlertDescription>{editFeedback.message}</AlertDescription>
         </Alert>
       )}
@@ -397,7 +416,7 @@ function FoodListPageContent() {
             setEditingItemId(null)
             setEditSaving(false)
             setEditFieldErrors({})
-            setEditFeedback((prev) => (prev?.type === "error" ? null : prev))
+            setEditDialogError("")
           }
         }}
       >
@@ -406,6 +425,13 @@ function FoodListPageContent() {
             <DialogTitle>Edit item</DialogTitle>
             <DialogDescription>Update the name, quantity, or category, then save your changes.</DialogDescription>
           </DialogHeader>
+
+          {editDialogError && (
+            <Alert variant="destructive" data-testid="edit-dialog-error">
+              <AlertTitle>Could not save changes</AlertTitle>
+              <AlertDescription>{editDialogError}</AlertDescription>
+            </Alert>
+          )}
           <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-col gap-1">
               <Label htmlFor="edit-item-name">Name</Label>
