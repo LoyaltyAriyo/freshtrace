@@ -17,6 +17,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  ITEM_NAME_MAX_LENGTH,
+  ITEM_QUANTITY_MAX,
+  type ItemFieldErrors,
+  validateFoodItemInput,
+} from "@/lib/validations"
 
 type FoodListItem = {
   id: string
@@ -34,39 +40,9 @@ const priorityStyles: Record<string, string> = {
   "use-later": "bg-green-100 text-green-800",
 }
 
-type EditFieldErrors = {
-  name?: string
-  quantity?: string
-  categoryId?: string
-}
-
-function validateEditedItemInput(
-  name: string,
-  quantityInput: string,
-  categoryId: string,
-): EditFieldErrors | null {
-  const errors: EditFieldErrors = {}
-  const trimmedName = name.trim()
-  if (!trimmedName) {
-    errors.name = "Item name is required."
-  }
-
-  const qtyRaw = quantityInput.trim()
-  if (qtyRaw === "") {
-    errors.quantity = "Quantity must be a whole number of at least 1."
-  } else {
-    const parsed = Number(qtyRaw)
-    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 1) {
-      errors.quantity = "Quantity must be a whole number of at least 1."
-    }
-  }
-
-  if (!categoryId.trim()) {
-    errors.categoryId = "Please select a category."
-  }
-
-  return Object.keys(errors).length > 0 ? errors : null
-}
+// Alias kept so the rest of the component compiles without renaming every
+// reference.  The canonical types now live in @/lib/validations.
+type EditFieldErrors = ItemFieldErrors
 
 function FoodListPageContent() {
   const searchParams = useSearchParams()
@@ -227,7 +203,7 @@ function FoodListPageContent() {
 
     setEditFeedback(null)
 
-    const validation = validateEditedItemInput(editName, editQuantityInput, editCategoryId)
+    const validation = validateFoodItemInput(editName, editQuantityInput, editCategoryId)
     if (validation) {
       setEditFieldErrors(validation)
       return
@@ -421,6 +397,7 @@ function FoodListPageContent() {
                     return next
                   })
                 }}
+                maxLength={ITEM_NAME_MAX_LENGTH}
                 disabled={editSaving}
                 aria-invalid={editFieldErrors.name ? true : undefined}
                 aria-describedby={editFieldErrors.name ? editNameErrorId : undefined}
@@ -437,6 +414,7 @@ function FoodListPageContent() {
                 id="edit-item-quantity"
                 type="number"
                 min={1}
+                max={ITEM_QUANTITY_MAX}
                 step={1}
                 value={editQuantityInput}
                 onChange={(e) => {
