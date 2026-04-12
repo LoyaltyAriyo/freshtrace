@@ -368,7 +368,7 @@ describe("FoodListPage success confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
 
     expect(
-      await screen.findByText("Quantity must be a whole number of at least 1."),
+      await screen.findByText("Quantity must be at least 1."),
     ).toBeInTheDocument()
     expect(fetchMock.mock.calls.length).toBe(callsAfterOpen)
   })
