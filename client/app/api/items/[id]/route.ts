@@ -6,6 +6,12 @@ type RouteContext = {
   params: Promise<{ id: string }>
 }
 
+type UpdateFoodItemPayload = {
+  name: unknown
+  quantity: unknown
+  categoryId: unknown
+}
+
 function isNotFoundPrismaError(
   error: unknown,
 ): error is { code: string } {
@@ -59,7 +65,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 })
     }
 
-    const { name, quantity, categoryId } = body as Record<string, unknown>
+    const { name, quantity, categoryId } = body as UpdateFoodItemPayload
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Item name is required." }, { status: 400 })
