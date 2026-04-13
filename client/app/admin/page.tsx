@@ -14,6 +14,8 @@ import {
   FileText,
   TrendingUp,
 } from "lucide-react"
+import { UsageTrendChart } from "@/components/admin/usage-trend-chart"
+import { ReportSummaryChart } from "@/components/admin/report-summary-chart"
 
 const timeRanges = [
   { value: "today", label: "Today" },
@@ -246,6 +248,14 @@ export default function AdminOverviewPage() {
             </p>
           </CardContent>
         </Card>
+      </section>
+
+      <section
+        className="grid gap-4 lg:grid-cols-2"
+        aria-label="Usage trends and summary charts"
+      >
+        <UsageTrendChart />
+        <ReportSummaryChart />
       </section>
     </div>
   )
