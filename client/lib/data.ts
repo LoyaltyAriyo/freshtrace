@@ -19,16 +19,17 @@ export interface Alert {
   type: "reminder" | "warning" | "info"
   read: boolean
 }
+export type ErrorSeverity = "low" | "medium" | "high" | "critical"
 
 export interface ErrorLogEntry {
   id: string
   timestamp: string
+  severity: ErrorSeverity
   errorType: string
   sourceComponent: string
   message: string
   details: string
 }
-
 export const CATEGORIES: { value: Category; label: string }[] = [
   { value: "produce", label: "Produce" },
   { value: "dairy", label: "Dairy" },
@@ -75,11 +76,11 @@ export const sampleAlerts: Alert[] = [
 ]
 
 export const sampleErrorLogs: ErrorLogEntry[] = [
-  { id: "e1", timestamp: daysAgo(0), errorType: "OCR_FAILURE", sourceComponent: "ReceiptScanner", message: "Failed to parse receipt image", details: "The uploaded image was too blurry for text extraction. Confidence score: 12%. Minimum required: 40%. User was shown error message and prompted to retry with a clearer image." },
-  { id: "e2", timestamp: daysAgo(1), errorType: "VALIDATION_ERROR", sourceComponent: "ManualEntry", message: "Invalid category value submitted", details: "User submitted form with category value 'frozen' which is not in the allowed enum. Form validation caught the error client-side. No data was persisted." },
-  { id: "e3", timestamp: daysAgo(2), errorType: "API_TIMEOUT", sourceComponent: "ReceiptProcessor", message: "Receipt processing API timed out after 30s", details: "External OCR API did not respond within the 30-second timeout window. Request ID: req_abc123. The receipt was queued for retry and processed successfully on second attempt." },
-  { id: "e4", timestamp: daysAgo(3), errorType: "AUTH_ERROR", sourceComponent: "HouseholdSync", message: "Household sync failed - invalid token", details: "JWT token expired during a long-running sync operation. Token was issued 25 hours ago, exceeding the 24-hour validity window. User session was refreshed automatically." },
-  { id: "e5", timestamp: daysAgo(5), errorType: "DB_ERROR", sourceComponent: "FoodItemStore", message: "Duplicate key constraint violation", details: "Attempted to insert food item with ID 'fi_xyz789' which already exists. This occurred during a retry after a network interruption. The existing record was kept unchanged." },
+  { id: "e1", timestamp: daysAgo(0),severity: "high", errorType: "OCR_FAILURE", sourceComponent: "ReceiptScanner", message: "Failed to parse receipt image", details: "The uploaded image was too blurry for text extraction. Confidence score: 12%. Minimum required: 40%. User was shown error message and prompted to retry with a clearer image." },
+  { id: "e2", timestamp: daysAgo(1),severity: "medium", errorType: "VALIDATION_ERROR", sourceComponent: "ManualEntry", message: "Invalid category value submitted", details: "User submitted form with category value 'frozen' which is not in the allowed enum. Form validation caught the error client-side. No data was persisted." },
+  { id: "e3", timestamp: daysAgo(2),severity: "high", errorType: "API_TIMEOUT", sourceComponent: "ReceiptProcessor", message: "Receipt processing API timed out after 30s", details: "External OCR API did not respond within the 30-second timeout window. Request ID: req_abc123. The receipt was queued for retry and processed successfully on second attempt." },
+  { id: "e4", timestamp: daysAgo(3),severity: "critical", errorType: "AUTH_ERROR", sourceComponent: "HouseholdSync", message: "Household sync failed - invalid token", details: "JWT token expired during a long-running sync operation. Token was issued 25 hours ago, exceeding the 24-hour validity window. User session was refreshed automatically." },
+  { id: "e5", timestamp: daysAgo(5),severity: "medium", errorType: "DB_ERROR", sourceComponent: "FoodItemStore", message: "Duplicate key constraint violation", details: "Attempted to insert food item with ID 'fi_xyz789' which already exists. This occurred during a retry after a network interruption. The existing record was kept unchanged." },
 ]
 
 export function getDaysStored(addedDate: string): number {
