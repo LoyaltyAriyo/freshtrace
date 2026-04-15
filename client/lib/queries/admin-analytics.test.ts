@@ -1,32 +1,47 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const foodItemCount = vi.fn()
-const foodItemGroupBy = vi.fn()
-const usedItemCount = vi.fn()
-const wastedItemCount = vi.fn()
-const wastedItemGroupBy = vi.fn()
-const wastedItemFindMany = vi.fn()
-const receiptCount = vi.fn()
-const categoryFindMany = vi.fn()
+const prismaMocks = vi.hoisted(() => {
+  return {
+    foodItemCount: vi.fn(),
+    foodItemGroupBy: vi.fn(),
+    usedItemCount: vi.fn(),
+    wastedItemCount: vi.fn(),
+    wastedItemGroupBy: vi.fn(),
+    wastedItemFindMany: vi.fn(),
+    receiptCount: vi.fn(),
+    categoryFindMany: vi.fn(),
+  }
+})
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     foodItem: {
-      count: foodItemCount,
-      groupBy: foodItemGroupBy,
+      count: prismaMocks.foodItemCount,
+      groupBy: prismaMocks.foodItemGroupBy,
     },
-    usedItem: { count: usedItemCount },
+    usedItem: { count: prismaMocks.usedItemCount },
     wastedItem: {
-      count: wastedItemCount,
-      groupBy: wastedItemGroupBy,
-      findMany: wastedItemFindMany,
+      count: prismaMocks.wastedItemCount,
+      groupBy: prismaMocks.wastedItemGroupBy,
+      findMany: prismaMocks.wastedItemFindMany,
     },
-    receipt: { count: receiptCount },
-    category: { findMany: categoryFindMany },
+    receipt: { count: prismaMocks.receiptCount },
+    category: { findMany: prismaMocks.categoryFindMany },
   },
 }))
 
 import { getAdminAnalyticsReport } from "./admin-analytics"
+
+const {
+  foodItemCount,
+  foodItemGroupBy,
+  usedItemCount,
+  wastedItemCount,
+  wastedItemGroupBy,
+  wastedItemFindMany,
+  receiptCount,
+  categoryFindMany,
+} = prismaMocks
 
 const FIXED_NOW = new Date("2026-04-13T12:00:00.000Z")
 
@@ -42,9 +57,7 @@ function resetMocks() {
 }
 
 function setupHappyPath() {
-  foodItemCount
-    .mockResolvedValueOnce(100)
-    .mockResolvedValueOnce(40)
+  foodItemCount.mockResolvedValueOnce(100).mockResolvedValueOnce(40)
   usedItemCount.mockResolvedValue(30)
   wastedItemCount.mockResolvedValue(10)
   receiptCount.mockResolvedValue(5)
@@ -122,6 +135,22 @@ describe("getAdminAnalyticsReport", () => {
     expect(result.summary.wasteRate).toBe(40)
   })
 
+  it("rounds wasteRate to two decimals for non-integer ratios", async () => {
+    resetMocks()
+    foodItemCount.mockResolvedValueOnce(1).mockResolvedValueOnce(1)
+    usedItemCount.mockResolvedValue(2)
+    wastedItemCount.mockResolvedValue(1)
+    receiptCount.mockResolvedValue(0)
+    foodItemGroupBy.mockResolvedValue([])
+    wastedItemGroupBy.mockResolvedValue([])
+    wastedItemFindMany.mockResolvedValue([])
+    categoryFindMany.mockResolvedValue([])
+
+    const result = await getAdminAnalyticsReport("7d")
+
+    expect(result.summary.wasteRate).toBe(33.33)
+  })
+
   it("applies start-of-day filter for today range on receipt count", async () => {
     await getAdminAnalyticsReport("today")
 
@@ -133,13 +162,42 @@ describe("getAdminAnalyticsReport", () => {
     })
   })
 
-  it("applies 30-day window for30d range on used items", async () => {
+  it("applies 7-day window on wasted item count", async () => {
+    await getAdminAnalyticsReport("7d")
+
+    const expectedStart = new Date(FIXED_NOW.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+    expect(wastedItemCount).toHaveBeenCalledWith({
+      where: { markedWastedAt: { gte: expectedStart } },
+    })
+  })
+
+  it("applies 30-day window on used items", async () => {
     await getAdminAnalyticsReport("30d")
 
     const expectedStart = new Date(FIXED_NOW.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     expect(usedItemCount).toHaveBeenCalledWith({
       where: { markedUsedAt: { gte: expectedStart } },
+    })
+  })
+
+  it("scopes recent waste query to range and orders by markedWastedAt desc", async () => {
+    const expectedStart = new Date(FIXED_NOW.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+    await getAdminAnalyticsReport("7d")
+
+    expect(wastedItemFindMany).toHaveBeenCalledWith({
+      where: { markedWastedAt: { gte: expectedStart } },
+      orderBy: { markedWastedAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        name: true,
+        quantity: true,
+        markedWastedAt: true,
+        category: { select: { name: true } },
+      },
     })
   })
 

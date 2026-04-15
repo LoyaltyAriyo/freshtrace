@@ -112,6 +112,18 @@ describe("GET /api/admin/analytics", () => {
     expect(getAdminAnalyticsReportMock).toHaveBeenCalledWith("30d")
   })
 
+  it("passes today range from query string", async () => {
+    requireAdminMock.mockResolvedValue({ ok: true })
+    getAdminAnalyticsReportMock.mockResolvedValue({
+      ...sampleReport,
+      range: "today",
+    })
+
+    await GET(new Request("http://localhost/api/admin/analytics?range=today"))
+
+    expect(getAdminAnalyticsReportMock).toHaveBeenCalledWith("today")
+  })
+
   it("defaults invalid range to 7d for query parsing", async () => {
     requireAdminMock.mockResolvedValue({ ok: true })
     getAdminAnalyticsReportMock.mockResolvedValue(sampleReport)

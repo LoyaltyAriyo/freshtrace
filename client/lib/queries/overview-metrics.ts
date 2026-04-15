@@ -13,7 +13,7 @@ export type OverviewMetrics = {
 }
 
 /**
- * Resolve a time-range string into a concrete start date.
+ * Start of the window for analytics queries (inclusive).
  */
 export function resolveStartDate(range: TimeRange): Date {
   const now = new Date()
@@ -29,7 +29,7 @@ export function resolveStartDate(range: TimeRange): Date {
 }
 
 /**
- * Normalise a raw query-string value into a valid TimeRange.
+ * Normalise query string to a supported range; unknown values default to 7d.
  */
 export function parseTimeRange(raw: string | null): TimeRange {
   const normalized = (raw ?? "").toLowerCase()
