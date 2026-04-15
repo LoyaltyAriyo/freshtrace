@@ -45,9 +45,6 @@ model User {
   accountStatus AccountStatus  @default(ACTIVE)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-
-  receipts      Receipt[]
-  foodItems     FoodItem[]
 }
 
 model Category {
@@ -67,10 +64,6 @@ model Receipt {
   imagePath    String
   ocrStatus    OcrStatus         @default(PENDING)
   uploadedAt   DateTime          @default(now())
-
-  userId       String?
-  user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-
   draftItems   ReceiptItemDraft[]
   foodItems    FoodItem[]        @relation("ReceiptFoodItems")
   usedItems    UsedItem[]        @relation("ReceiptUsedItems")
@@ -110,8 +103,6 @@ model FoodItem {
 
   receiptId    String?
   receipt      Receipt?        @relation("ReceiptFoodItems", fields: [receiptId], references: [id])
-  userId       String?
-  user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   usedEntry    UsedItem?
   wastedEntry  WastedItem?
 
