@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Home, LayoutDashboard, ScanLine, UtensilsCrossed, User, Users } from "lucide-react"
@@ -25,7 +25,6 @@ type AppNavProps = {
 
 export function AppNav({ variant = "default" }: AppNavProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
 
   const navItems = variant === "admin" ? adminNav : userNav
@@ -45,8 +44,7 @@ export function AppNav({ variant = "default" }: AppNavProps) {
       // Minimal handling: ignore and still redirect.
     } finally {
       setSigningOut(false)
-      router.push("/login")
-      router.refresh()
+      window.location.href = "/login"
     }
   }
 

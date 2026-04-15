@@ -276,9 +276,12 @@ describe("FoodListPage success confirmation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
 
-    const errorAlert = await screen.findByTestId("edit-item-error")
+    const errorAlert = await screen.findByTestId("edit-dialog-error")
     expect(errorAlert).toHaveTextContent("Could not save changes")
     expect(errorAlert).toHaveTextContent("Item name is required.")
+
+    // Dialog stays open so the user can fix the issue
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument()
   })
 
   it("does not call PATCH when the name is blank after client validation", async () => {
@@ -368,8 +371,122 @@ describe("FoodListPage success confirmation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
 
     expect(
-      await screen.findByText("Quantity must be a whole number of at least 1."),
+      await screen.findByText("Quantity must be at least 1."),
     ).toBeInTheDocument()
     expect(fetchMock.mock.calls.length).toBe(callsAfterOpen)
+  })
+
+  it("auto-dismisses the success message after 5 seconds", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    getSearchParamMock.mockReturnValue(null)
+
+    const updatedRow = {
+      id: "item-1",
+      name: "Banana",
+      quantity: 4,
+      categoryId: "cat-produce",
+      categoryName: "Produce",
+      dateAdded: "2026-03-22T00:00:00.000Z",
+      priority: "use-soon" as const,
+    }
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([updatedRow]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([{ id: "cat-produce", name: "Produce" }]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          id: "item-1",
+          name: "Banana",
+          quantity: 4,
+          categoryId: "cat-produce",
+          category: { name: "Produce" },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([updatedRow]),
+      })
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<FoodListPage />)
+
+    expect(await screen.findByText("Banana")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
+
+    const success = await screen.findByTestId("edit-item-success")
+    expect(success).toBeInTheDocument()
+
+    // Advance timer past the 5-second auto-dismiss
+    await vi.advanceTimersByTimeAsync(5100)
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("edit-item-success")).not.toBeInTheDocument()
+    })
+
+    vi.useRealTimers()
+  })
+
+  it("shows a network error inside the dialog when fetch throws", async () => {
+    getSearchParamMock.mockReturnValue(null)
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            id: "item-1",
+            name: "Milk",
+            quantity: 1,
+            categoryId: "cat-dairy",
+            categoryName: "Dairy",
+            dateAdded: "2026-03-22T00:00:00.000Z",
+            priority: "use-soon",
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue([{ id: "cat-dairy", name: "Dairy" }]),
+      })
+      // Simulate network failure
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+
+    vi.stubGlobal("fetch", fetchMock)
+
+    render(<FoodListPage />)
+
+    expect(await screen.findByText("Milk")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }))
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("edit-dialog-error")).toHaveTextContent("Unable to reach the server")
+    })
+
+    // Dialog stays open so user can retry
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument()
   })
 })

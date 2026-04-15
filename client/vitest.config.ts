@@ -1,16 +1,15 @@
-import path from "node:path"
 import { defineConfig } from "vitest/config"
+import path from "path"
 
 export default defineConfig({
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "."),
+      "@": path.resolve(__dirname, "./"),
     },
   },
   test: {
-    environment: "node",
+    environment: "jsdom",   // ✅ FIXED
     globals: true,
-    setupFiles: ["./vitest.setup.ts"],
+    setupFiles: "./vitest.setup.ts",
   },
 })
-

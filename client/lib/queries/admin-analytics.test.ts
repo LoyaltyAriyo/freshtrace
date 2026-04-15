@@ -201,7 +201,7 @@ describe("getAdminAnalyticsReport", () => {
     })
   })
 
-  it("maps breakdown category names and recent waste ISO timestamps (report display shape)", async () => {
+  it("maps breakdown category names and recent waste ISO timestamps", async () => {
     const result = await getAdminAnalyticsReport("7d")
 
     expect(result.breakdown.itemsByCategory[0]).toEqual({

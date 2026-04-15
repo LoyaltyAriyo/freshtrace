@@ -76,6 +76,13 @@ import { updateReceiptMock, createDraftItemsMock, findCategoriesMock, createCate
 // @ts-expect-error - test-only mocked exports
 import { extractReceiptDraftItemsMock } from "@/lib/ocr"
 
+function makeTestRequest(formData: FormData): Request {
+  return {
+    headers: new Headers(),
+    formData: async () => formData,
+  } as unknown as Request
+}
+
 describe("POST /api/receipts route", () => {
   beforeEach(() => {
     uploadMock.mockReset()
@@ -97,10 +104,7 @@ describe("POST /api/receipts route", () => {
   it("returns 400 when no file is uploaded", async () => {
     const formData = new FormData()
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 
@@ -116,10 +120,7 @@ describe("POST /api/receipts route", () => {
       new File(["data"], "test.txt", { type: "text/plain" })
     )
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 
@@ -137,10 +138,7 @@ describe("POST /api/receipts route", () => {
     )
     formData.append("receipt", bigFile)
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 
@@ -173,10 +171,7 @@ describe("POST /api/receipts route", () => {
       new File(["data"], "receipt.jpg", { type: "image/jpeg" })
     )
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 
@@ -222,10 +217,7 @@ describe("POST /api/receipts route", () => {
       new File(["data"], "receipt.jpg", { type: "image/jpeg" })
     )
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 
@@ -258,10 +250,7 @@ describe("POST /api/receipts route", () => {
       new File(["data"], "receipt.jpg", { type: "image/jpeg" })
     )
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 
@@ -292,10 +281,7 @@ describe("POST /api/receipts route", () => {
       new File(["data"], "receipt.jpg", { type: "image/jpeg" })
     )
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 
@@ -317,10 +303,7 @@ describe("POST /api/receipts route", () => {
       new File(["data"], "receipt.jpg", { type: "image/jpeg" })
     )
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 
@@ -339,10 +322,7 @@ describe("POST /api/receipts route", () => {
       new File(["data"], "receipt.jpg", { type: "image/jpeg" })
     )
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 
@@ -363,10 +343,7 @@ describe("POST /api/receipts route", () => {
       new File(["data"], "receipt.jpg", { type: "image/jpeg" })
     )
 
-    const request = new Request("http://localhost/api/receipts", {
-      method: "POST",
-      body: formData as FormData,
-    })
+    const request = makeTestRequest(formData)
 
     const response = await POST(request)
 

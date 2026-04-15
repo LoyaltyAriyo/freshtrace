@@ -25,6 +25,9 @@ export const NOISE_PATTERNS = [
 	/\bcustomer\s+copy\b/i,
 	/\bdate\b/i,
 	/\b(mon|tue|wed|thu|fri|sat|sun)\b/i,
+	/^\*+$/,
+	/\bspec[a-z]{2,4}\b/i,
+	/\bloyalty\b/i,
 ]
 
 function cleanupLine(rawLine: string): string {
@@ -39,8 +42,13 @@ function isLikelyNoise(line: string): boolean {
 	if (!/[a-z]/i.test(line)) return true
 	if (line.length < 2) return true
 	// Lines that are mostly weight/price metadata like "0.442kg NET @ $2.99/kg"
-	if (/^\d+(\.\d+)?\s*kg\b/i.test(line)) return true
-	if (/\bkg\b.*\$\d+[.,]\d{2}/i.test(line)) return true
+	// Also catch OCR misreads of "kg" as "ka", "kq", etc.
+	if (/^\d+(\.\d+)?\s*k[a-z]\b/i.test(line)) return true
+	if (/\bk[a-z]\b.*\$\d+[.,]\d{2}/i.test(line)) return true
+	// Filter gibberish lines with mostly repeated short tokens (e.g. "ERE RRR RR RRR")
+	const tokens = line.split(/\s+/)
+	const gibberishTokens = tokens.filter((t) => /^([a-z])\1*$/i.test(t) || /^[a-z]{1,3}$/i.test(t))
+	if (tokens.length > 2 && gibberishTokens.length / tokens.length > 0.6) return true
 	return NOISE_PATTERNS.some((pattern) => pattern.test(line))
 }
 

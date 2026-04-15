@@ -68,7 +68,6 @@ export async function POST(request: Request) {
     }
 
     const file = entry as File
-
     if (!file.type || !ALLOWED_IMAGE_MIME_TYPES.has(file.type)) {
       return Response.json(
         { error: "Invalid file type. Please upload a JPG, PNG, HEIC, or WebP image." },

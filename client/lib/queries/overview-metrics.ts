@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 import { prisma } from "@/lib/prisma"
 
 export type TimeRange = "today" | "7d" | "30d"
@@ -14,13 +13,7 @@ export type OverviewMetrics = {
 }
 
 /**
- * Resolve a time-range string into a concrete start date.
-=======
-export type TimeRange = "today" | "7d" | "30d"
-
-/**
  * Start of the window for analytics queries (inclusive).
->>>>>>> Stashed changes
  */
 export function resolveStartDate(range: TimeRange): Date {
   const now = new Date()
@@ -36,11 +29,7 @@ export function resolveStartDate(range: TimeRange): Date {
 }
 
 /**
-<<<<<<< Updated upstream
- * Normalise a raw query-string value into a valid TimeRange.
-=======
  * Normalise query string to a supported range; unknown values default to 7d.
->>>>>>> Stashed changes
  */
 export function parseTimeRange(raw: string | null): TimeRange {
   const normalized = (raw ?? "").toLowerCase()
@@ -49,7 +38,6 @@ export function parseTimeRange(raw: string | null): TimeRange {
   }
   return "7d"
 }
-<<<<<<< Updated upstream
 
 /**
  * Collect all overview metrics for the admin dashboard.
@@ -106,5 +94,3 @@ export async function getOverviewMetrics(range: TimeRange): Promise<OverviewMetr
     wasteRate: Math.round(wasteRate * 100) / 100,
   }
 }
-=======
->>>>>>> Stashed changes

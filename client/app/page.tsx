@@ -6,10 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { PrioritySection } from "@/components/priority-section"
 import { RecentAlerts } from "@/components/recent-alerts"
-import { sampleAlerts } from "@/lib/data"
 import type { FoodItem } from "@/lib/data"
 import { Loader2, Plus, ScanLine } from "lucide-react"
-import MetricCard from "@/components/ui/metric-card" // ✅ ADD THIS
+import MetricCard from "@/components/ui/metric-card"
 
 type PrioritizedResponse = {
   items: FoodItem[]
@@ -25,6 +24,9 @@ export default function HomePage() {
     useSoon: [],
     useLater: [],
   })
+
+  const [alerts, setAlerts] = useState<any[]>([]) // ✅ NEW
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -62,7 +64,22 @@ export default function HomePage() {
       }
     }
 
+    async function loadAlerts() {
+      try {
+        const res = await fetch("/api/alerts")
+        const data = await res.json()
+        if (!cancelled) {
+          setAlerts(Array.isArray(data) ? data : [])
+        }
+      } catch {
+        if (!cancelled) {
+          setAlerts([])
+        }
+      }
+    }
+
     loadPrioritizedItems()
+    loadAlerts()
 
     return () => {
       cancelled = true
@@ -81,6 +98,7 @@ export default function HomePage() {
             {priorityData.items.length} active items in your kitchen
           </p>
         </div>
+
         <div className="flex gap-2">
           <Button asChild>
             <Link href="/manual-entry">
@@ -88,6 +106,7 @@ export default function HomePage() {
               Add Entry
             </Link>
           </Button>
+
           <Button variant="outline" asChild>
             <Link href="/scan">
               <ScanLine className="mr-1.5 h-4 w-4" />
@@ -97,6 +116,7 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Error */}
       {error && (
         <Alert variant="destructive" data-testid="priority-load-error">
           <AlertTitle>Unable to load priorities</AlertTitle>
@@ -104,8 +124,9 @@ export default function HomePage() {
         </Alert>
       )}
 
+      {/* Loading */}
       {loading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="priority-loading">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Loading priority overview...</span>
         </div>
@@ -148,9 +169,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Recent Alerts */}
+      {/* ✅ Dynamic Alerts */}
       <section aria-label="Recent alerts">
-        <RecentAlerts alerts={sampleAlerts} />
+        <RecentAlerts alerts={alerts} />
       </section>
     </div>
   )

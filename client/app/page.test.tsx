@@ -127,9 +127,13 @@ describe("HomePage priority overview", () => {
 
     render(<HomePage />)
 
-    const useFirstHeading = await screen.findByText("Use First")
-    const useSoonHeading = await screen.findByText("Use Soon")
-    const useLaterHeading = await screen.findByText("Use Later")
+    const priorityOverview = await screen.findByRole("region", {
+      name: "Priority overview",
+    })
+
+    const useFirstHeading = within(priorityOverview).getByText("Use First")
+    const useSoonHeading = within(priorityOverview).getByText("Use Soon")
+    const useLaterHeading = within(priorityOverview).getByText("Use Later")
 
     const useFirstCard = useFirstHeading.parentElement?.parentElement as HTMLElement
     const useSoonCard = useSoonHeading.parentElement?.parentElement as HTMLElement
