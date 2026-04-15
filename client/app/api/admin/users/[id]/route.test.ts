@@ -57,7 +57,10 @@ describe("GET /api/admin/users/[id]", () => {
       id: "u1",
       email: "a@example.com",
       fullName: "Ada",
-      accountStatus: "ACTIVE",
+      role: "USER" as const,
+      accountStatus: "ACTIVE" as const,
+      createdAt: new Date("2025-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2025-01-01T00:00:00.000Z"),
     })
 
     const response = await GET(new Request("http://localhost/api/admin/users/u1"), {
