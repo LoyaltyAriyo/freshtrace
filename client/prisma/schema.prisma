@@ -43,6 +43,21 @@ enum NotificationType {
   INFO
 }
 
+enum ErrorSeverity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+enum ErrorSource {
+  OCR
+  API
+  DB
+  AUTH
+  SYSTEM
+}
+
 model User {
   id            String         @id
   email         String         @unique
@@ -182,4 +197,15 @@ model Notification {
   isRead      Boolean          @default(false)
 
   createdAt   DateTime         @default(now())
+}
+
+model ErrorLog {
+  id         String        @id @default(cuid())
+  message    String
+  errorType  String
+  severity   ErrorSeverity
+  source     ErrorSource
+  details    Json?
+  stackTrace String?
+  createdAt  DateTime      @default(now())
 }
