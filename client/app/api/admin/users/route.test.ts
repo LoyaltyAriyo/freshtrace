@@ -5,22 +5,16 @@ vi.mock("@/lib/auth/require-admin", () => ({
   requireAdmin: vi.fn(),
 }))
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    user: {
-      findMany: vi.fn(),
-      count: vi.fn(),
-    },
-  },
+vi.mock("@/lib/queries/admin-users", () => ({
+  getAdminUserRecords: vi.fn(),
 }))
 
 import { GET } from "./route"
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { prisma } from "@/lib/prisma"
+import { getAdminUserRecords } from "@/lib/queries/admin-users"
 
 const requireAdminMock = vi.mocked(requireAdmin)
-const findManyUserMock = vi.mocked(prisma.user.findMany)
-const countUserMock = vi.mocked(prisma.user.count)
+const getAdminUserRecordsMock = vi.mocked(getAdminUserRecords)
 
 const NOW = new Date("2025-01-01T00:00:00.000Z")
 
@@ -32,7 +26,6 @@ function makeUser(overrides: object = {}) {
     role: "USER" as const,
     accountStatus: "ACTIVE" as const,
     createdAt: NOW,
-    updatedAt: NOW,
     ...overrides,
   }
 }
@@ -40,8 +33,7 @@ function makeUser(overrides: object = {}) {
 describe("GET /api/admin/users", () => {
   beforeEach(() => {
     requireAdminMock.mockReset()
-    findManyUserMock.mockReset()
-    countUserMock.mockReset()
+    getAdminUserRecordsMock.mockReset()
   })
 
   it("returns 401 when requireAdmin fails with unauthorized", async () => {
@@ -68,11 +60,13 @@ describe("GET /api/admin/users", () => {
 
   it("returns users with activity labels and pagination when authorized", async () => {
     requireAdminMock.mockResolvedValue({ ok: true })
-    findManyUserMock.mockResolvedValue([
-      makeUser({ id: "u1", email: "a@example.com", fullName: "Ada", accountStatus: "ACTIVE" }),
-      makeUser({ id: "u2", email: "b@example.com", fullName: "Bob", accountStatus: "DISABLED" }),
-    ])
-    countUserMock.mockResolvedValue(2)
+    getAdminUserRecordsMock.mockResolvedValue({
+      users: [
+        makeUser({ id: "u1", email: "a@example.com", fullName: "Ada", accountStatus: "ACTIVE" }),
+        makeUser({ id: "u2", email: "b@example.com", fullName: "Bob", accountStatus: "DISABLED" }),
+      ],
+      total: 2,
+    })
 
     const response = await GET(new Request("http://localhost/api/admin/users"))
 
@@ -97,89 +91,77 @@ describe("GET /api/admin/users", () => {
       limit: 20,
       totalPages: 1,
     })
-    expect(findManyUserMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {},
-        orderBy: { createdAt: "desc" },
-        skip: 0,
-        take: 20,
-        select: expect.objectContaining({
-          email: true,
-          fullName: true,
-          role: true,
-          accountStatus: true,
-          createdAt: true,
-        }),
-      }),
-    )
+    expect(getAdminUserRecordsMock).toHaveBeenCalledWith({
+      where: {},
+      limit: 20,
+      offset: 0,
+    })
   })
 
   it("applies search q on fullName and email (case-insensitive)", async () => {
     requireAdminMock.mockResolvedValue({ ok: true })
-    findManyUserMock.mockResolvedValue([])
-    countUserMock.mockResolvedValue(0)
+    getAdminUserRecordsMock.mockResolvedValue({ users: [], total: 0 })
 
     await GET(new Request("http://localhost/api/admin/users?q=ada"))
 
-    expect(findManyUserMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          OR: [
-            { fullName: { contains: "ada", mode: "insensitive" } },
-            { email: { contains: "ada", mode: "insensitive" } },
-          ],
-        },
-      }),
-    )
+    expect(getAdminUserRecordsMock).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { fullName: { contains: "ada", mode: "insensitive" } },
+          { email: { contains: "ada", mode: "insensitive" } },
+        ],
+      },
+      limit: 20,
+      offset: 0,
+    })
   })
 
   it("applies status filter when status is ACTIVE or DISABLED", async () => {
     requireAdminMock.mockResolvedValue({ ok: true })
-    findManyUserMock.mockResolvedValue([])
-    countUserMock.mockResolvedValue(0)
+    getAdminUserRecordsMock.mockResolvedValue({ users: [], total: 0 })
 
     await GET(new Request("http://localhost/api/admin/users?status=ACTIVE"))
 
-    expect(findManyUserMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { accountStatus: "ACTIVE" },
-      }),
-    )
+    expect(getAdminUserRecordsMock).toHaveBeenCalledWith({
+      where: { accountStatus: "ACTIVE" },
+      limit: 20,
+      offset: 0,
+    })
   })
 
   it("combines q and status filters", async () => {
     requireAdminMock.mockResolvedValue({ ok: true })
-    findManyUserMock.mockResolvedValue([])
-    countUserMock.mockResolvedValue(0)
+    getAdminUserRecordsMock.mockResolvedValue({ users: [], total: 0 })
 
     await GET(new Request("http://localhost/api/admin/users?q=test&status=DISABLED"))
 
-    expect(findManyUserMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          accountStatus: "DISABLED",
-          OR: [
-            { fullName: { contains: "test", mode: "insensitive" } },
-            { email: { contains: "test", mode: "insensitive" } },
-          ],
-        },
-      }),
-    )
+    expect(getAdminUserRecordsMock).toHaveBeenCalledWith({
+      where: {
+        accountStatus: "DISABLED",
+        OR: [
+          { fullName: { contains: "test", mode: "insensitive" } },
+          { email: { contains: "test", mode: "insensitive" } },
+        ],
+      },
+      limit: 20,
+      offset: 0,
+    })
   })
 
   it("paginates using page and limit params", async () => {
     requireAdminMock.mockResolvedValue({ ok: true })
-    findManyUserMock.mockResolvedValue([])
-    countUserMock.mockResolvedValue(50)
+    getAdminUserRecordsMock.mockResolvedValue({ users: [], total: 50 })
 
     const response = await GET(new Request("http://localhost/api/admin/users?page=3&limit=10"))
 
     expect(response.status).toBe(200)
     const body = await response.json()
     expect(body.pagination).toMatchObject({ page: 3, limit: 10, total: 50, totalPages: 5 })
-    expect(findManyUserMock).toHaveBeenCalledWith(
-      expect.objectContaining({ skip: 20, take: 10 }),
-    )
+    expect(getAdminUserRecordsMock).toHaveBeenCalledWith({
+      where: {},
+      limit: 10,
+      offset: 20,
+    })
   })
 
   it("returns 400 for invalid status query", async () => {
@@ -188,7 +170,7 @@ describe("GET /api/admin/users", () => {
     const response = await GET(new Request("http://localhost/api/admin/users?status=maybe"))
 
     expect(response.status).toBe(400)
-    expect(findManyUserMock).not.toHaveBeenCalled()
+    expect(getAdminUserRecordsMock).not.toHaveBeenCalled()
   })
 
   it("returns 400 for invalid page param", async () => {
@@ -197,7 +179,7 @@ describe("GET /api/admin/users", () => {
     const response = await GET(new Request("http://localhost/api/admin/users?page=0"))
 
     expect(response.status).toBe(400)
-    expect(findManyUserMock).not.toHaveBeenCalled()
+    expect(getAdminUserRecordsMock).not.toHaveBeenCalled()
   })
 
   it("returns 400 for limit exceeding maximum", async () => {
@@ -206,13 +188,12 @@ describe("GET /api/admin/users", () => {
     const response = await GET(new Request("http://localhost/api/admin/users?limit=999"))
 
     expect(response.status).toBe(400)
-    expect(findManyUserMock).not.toHaveBeenCalled()
+    expect(getAdminUserRecordsMock).not.toHaveBeenCalled()
   })
 
   it("returns 500 when findMany throws", async () => {
     requireAdminMock.mockResolvedValue({ ok: true })
-    findManyUserMock.mockRejectedValue(new Error("db"))
-    countUserMock.mockResolvedValue(0)
+    getAdminUserRecordsMock.mockRejectedValue(new Error("db"))
 
     const response = await GET(new Request("http://localhost/api/admin/users"))
 

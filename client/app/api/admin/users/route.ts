@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import type { Prisma } from "@/generated/prisma-client"
 
 import { requireAdmin } from "@/lib/auth/require-admin"
-import { prisma } from "@/lib/prisma"
+import { getAdminUserRecords } from "@/lib/queries/admin-users"
 
 const PAGE_SIZE_DEFAULT = 20
 const PAGE_SIZE_MAX = 100
@@ -79,23 +79,11 @@ export async function GET(request: Request) {
   const skip = (page - 1) * limit
 
   try {
-    const [rows, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          accountStatus: true,
-          createdAt: true,
-        },
-      }),
-      prisma.user.count({ where }),
-    ])
+    const { users: rows, total } = await getAdminUserRecords({
+      where,
+      limit,
+      offset: skip,
+    })
 
     const users = rows.map((u) => ({
       id: u.id,
