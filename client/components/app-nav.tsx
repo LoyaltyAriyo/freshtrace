@@ -3,6 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
+import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Home, LayoutDashboard, ScanLine, UtensilsCrossed, User, Users } from "lucide-react"
 
@@ -24,12 +25,27 @@ type AppNavProps = {
 
 export function AppNav({ variant = "default" }: AppNavProps) {
   const pathname = usePathname()
+  const [signingOut, setSigningOut] = useState(false)
+
   const navItems = variant === "admin" ? adminNav : userNav
 
   function isNavActive(href: string) {
     if (href === "/") return pathname === href
     if (href === "/admin") return pathname === "/admin"
     return pathname === href || pathname.startsWith(`${href}/`)
+  }
+
+  async function handleSignOut() {
+    if (signingOut) return
+    setSigningOut(true)
+    try {
+      await fetch("/api/auth/logout", { method: "POST" })
+    } catch {
+      // Minimal handling: ignore and still redirect.
+    } finally {
+      setSigningOut(false)
+      window.location.href = "/login"
+    }
   }
 
   return (
@@ -69,13 +85,23 @@ export function AppNav({ variant = "default" }: AppNavProps) {
                 </Link>
               )
             })}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className={cn(
+                "ml-2 flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
+              )}
+            >
+              {signingOut ? "Signing out..." : "Sign out"}
+            </button>
           </nav>
         </div>
       </header>
 
       <nav
         className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md md:hidden"
-        role="tablist"
         aria-label="Main navigation"
       >
         <div className="mx-auto flex h-16 max-w-lg items-center justify-around px-2">
@@ -86,8 +112,7 @@ export function AppNav({ variant = "default" }: AppNavProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                role="tab"
-                aria-selected={isActive}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 transition-colors",
                   isActive ? "text-primary" : "text-muted-foreground"

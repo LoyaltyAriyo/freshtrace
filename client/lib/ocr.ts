@@ -82,9 +82,14 @@ function parseLineToItem(line: string, confidence: number | null): OcrDraftItem 
 		.trim()
 
 	if (!cleanLine || !/[a-z]/i.test(cleanLine)) return null
+	// Filter gibberish: lines where most tokens are 1-3 repeated letters (e.g. "ERE RRR RR")
+	const tokens = cleanLine.split(/\s+/)
+	const gibberishTokens = tokens.filter((t) => /^([a-z])\1*$/i.test(t) || /^[a-z]{1,3}$/i.test(t))
+	if (tokens.length > 2 && gibberishTokens.length / tokens.length > 0.6) return null
 	// Treat lines that are clearly metadata (weights, dates, headers, etc.) as noise.
-	if (/^\d+(\.\d+)?\s*kg\b/i.test(cleanLine)) return null
-	if (/\bkg\b.*\$\d+[.,]\d{2}/i.test(cleanLine)) return null
+	// Also catch OCR misreads of "kg" as "ka", "kq", etc.
+	if (/^\d+(\.\d+)?\s*k[a-z]\b/i.test(cleanLine)) return null
+	if (/\bk[a-z]\b.*\$\d+[.,]\d{2}/i.test(cleanLine)) return null
 	if (NOISE_PATTERNS.some((pattern) => pattern.test(cleanLine))) return null
 
 	const startQty = cleanLine.match(/^(\d{1,3})\s*x?\s+(.+)$/i)

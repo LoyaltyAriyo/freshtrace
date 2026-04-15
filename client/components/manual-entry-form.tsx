@@ -26,11 +26,17 @@ export function ManualEntryForm() {
       setError("Item name is required.")
       return
     }
+
     const parsedQuantity = Number(quantity)
-    if (!Number.isFinite(parsedQuantity) || !Number.isInteger(parsedQuantity) || parsedQuantity < 1) {
+    if (
+      !Number.isFinite(parsedQuantity) ||
+      !Number.isInteger(parsedQuantity) ||
+      parsedQuantity < 1
+    ) {
       setError("Quantity must be a whole number of at least 1.")
       return
     }
+
     if (!categoryId) {
       setError("Please select a category.")
       return
@@ -42,16 +48,24 @@ export function ManualEntryForm() {
     try {
       const response = await fetch("/api/items", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmedName, quantity, categoryId }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          quantity: parsedQuantity, // ✅ FIXED
+          categoryId,
+        }),
       })
 
       if (!response.ok) {
         const data = await response.json().catch(() => null)
-        throw new Error(data?.error || "Failed to Add to Food List.")
+        throw new Error(data?.error || "Failed to add item.")
       }
 
+      // redirect + refresh
       router.push("/food-list")
+      router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save item.")
       setLoading(false)
@@ -60,6 +74,7 @@ export function ManualEntryForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Error */}
       {error && (
         <Alert variant="destructive">
           <AlertTitle>Error</AlertTitle>
@@ -67,6 +82,7 @@ export function ManualEntryForm() {
         </Alert>
       )}
 
+      {/* Name */}
       <div className="flex flex-col gap-1">
         <Label htmlFor="item-name">Item Name</Label>
         <Input
@@ -75,10 +91,11 @@ export function ManualEntryForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={loading}
-          aria-required="true"
+          required
         />
       </div>
 
+      {/* Quantity */}
       <div className="flex flex-col gap-1">
         <Label htmlFor="item-quantity">Quantity</Label>
         <Input
@@ -86,12 +103,15 @@ export function ManualEntryForm() {
           type="number"
           min={1}
           value={quantity}
-          onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+          onChange={(e) =>
+            setQuantity(Math.max(1, Number(e.target.value)))
+          }
           disabled={loading}
-          aria-required="true"
+          required
         />
       </div>
 
+      {/* Category */}
       <div className="flex flex-col gap-1">
         <Label>Category</Label>
         <CategoryDropdown
@@ -101,8 +121,11 @@ export function ManualEntryForm() {
         />
       </div>
 
-      <Button type="submit" disabled={loading} className="w-fit">
-        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      {/* Submit */}
+      <Button type="submit" disabled={loading} className="w-full">
+        {loading && (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        )}
         Save Item
       </Button>
     </form>

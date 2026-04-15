@@ -37,6 +37,12 @@ enum AccountStatus {
   DISABLED
 }
 
+enum NotificationType {
+  REMINDER
+  WARNING
+  INFO
+}
+
 model User {
   id            String         @id
   email         String         @unique
@@ -45,6 +51,10 @@ model User {
   accountStatus AccountStatus  @default(ACTIVE)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  receipts      Receipt[]
+  foodItems     FoodItem[]
+  notifications Notification[]
 }
 
 model Category {
@@ -64,6 +74,10 @@ model Receipt {
   imagePath    String
   ocrStatus    OcrStatus         @default(PENDING)
   uploadedAt   DateTime          @default(now())
+
+  userId       String?
+  user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   draftItems   ReceiptItemDraft[]
   foodItems    FoodItem[]        @relation("ReceiptFoodItems")
   usedItems    UsedItem[]        @relation("ReceiptUsedItems")
@@ -103,11 +117,15 @@ model FoodItem {
 
   receiptId    String?
   receipt      Receipt?        @relation("ReceiptFoodItems", fields: [receiptId], references: [id])
+  userId       String?
+  user         User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   usedEntry    UsedItem?
   wastedEntry  WastedItem?
 
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
+
+  notifications Notification[]
 }
 
 model UsedItem {
@@ -148,4 +166,20 @@ model WastedItem {
 
   markedWastedAt  DateTime       @default(now())
   createdAt       DateTime       @default(now())
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  foodItemId  String?
+  foodItem    FoodItem?        @relation(fields: [foodItemId], references: [id], onDelete: SetNull)
+
+  message     String
+  type        NotificationType @default(INFO)
+  isRead      Boolean          @default(false)
+
+  createdAt   DateTime         @default(now())
 }
