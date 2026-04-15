@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { calculatePriority } from "@/lib/priority"
 
 type ItemPriority = "use-first" | "use-soon" | "use-later"
 
@@ -11,6 +12,7 @@ type FoodListQueryItem = {
   category: {
     id: string
     name: string
+    shelfLifeDays: number
   }
 }
 
@@ -18,15 +20,6 @@ type CreateFoodItemPayload = {
   name: string
   quantity: number
   categoryId: string
-}
-
-function toPriority(dateAdded: Date): ItemPriority {
-  const ageInDays =
-    (Date.now() - new Date(dateAdded).getTime()) / (1000 * 60 * 60 * 24)
-
-  if (ageInDays >= 7) return "use-first"
-  if (ageInDays >= 3) return "use-soon"
-  return "use-later"
 }
 
 function badRequest(message: string) {
@@ -56,6 +49,7 @@ export async function GET() {
           select: {
             id: true,
             name: true,
+            shelfLifeDays: true,
           },
         },
       },
@@ -69,7 +63,7 @@ export async function GET() {
       status: item.status,
       categoryId: item.category.id,
       categoryName: item.category.name,
-      priority: toPriority(item.dateAdded),
+      priority: calculatePriority(item.dateAdded, item.category.shelfLifeDays, item.category.name) as ItemPriority,
     }))
 
     return Response.json(payload)

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
+import { calculatePriority } from "@/lib/priority"
 
 type ItemPriority = "use-first" | "use-soon" | "use-later"
 type CategoryKey = "produce" | "dairy" | "meat" | "leftovers" | "pantry" | "other"
@@ -21,16 +22,8 @@ type RawPrioritizedItem = {
   dateAdded: Date
   category: {
     name: string
+    shelfLifeDays: number
   }
-}
-
-function toPriority(dateAdded: Date): ItemPriority {
-  const ageInDays =
-    (Date.now() - new Date(dateAdded).getTime()) / (1000 * 60 * 60 * 24)
-
-  if (ageInDays >= 7) return "use-first"
-  if (ageInDays >= 3) return "use-soon"
-  return "use-later"
 }
 
 function toCategoryKey(value: string): CategoryKey {
@@ -76,6 +69,7 @@ export async function GET(request: Request) {
         category: {
           select: {
             name: true,
+            shelfLifeDays: true,
           },
         },
       },
@@ -87,7 +81,7 @@ export async function GET(request: Request) {
       category: toCategoryKey(item.category.name),
       quantity: String(item.quantity),
       addedDate: item.dateAdded.toISOString(),
-      priority: toPriority(item.dateAdded),
+      priority: calculatePriority(item.dateAdded, item.category.shelfLifeDays, item.category.name) as ItemPriority,
       status: "active",
     }))
 
