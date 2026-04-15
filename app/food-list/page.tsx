@@ -8,6 +8,7 @@ type Item = {
   category: string;
   expiryDate: string;
   status: "fresh" | "expiring" | "expired";
+  severity: "low" | "medium" | "high"; // ✅ NEW
 };
 
 const statusStyles: Record<string, string> = {
@@ -16,9 +17,16 @@ const statusStyles: Record<string, string> = {
   expired: "bg-red-100 text-red-800",
 };
 
+const severityStyles: Record<string, string> = {
+  low: "bg-green-100 text-green-800",
+  medium: "bg-yellow-100 text-yellow-800",
+  high: "bg-red-100 text-red-800",
+};
+
 export default function FoodListPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [category, setCategory] = useState("");
+  const [severity, setSeverity] = useState(""); // ✅ NEW
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -26,6 +34,7 @@ export default function FoodListPage() {
     let url = "/api/items?";
 
     if (category) url += `category=${category}&`;
+    if (severity) url += `severity=${severity}&`; // ✅ NEW
     if (startDate) url += `startDate=${startDate}&`;
     if (endDate) url += `endDate=${endDate}`;
 
@@ -38,7 +47,7 @@ export default function FoodListPage() {
   // 🔥 fetch when filters change
   useEffect(() => {
     fetchItems();
-  }, [category, startDate, endDate]);
+  }, [category, severity, startDate, endDate]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -52,6 +61,7 @@ export default function FoodListPage() {
 
       {/* FILTERS */}
       <div className="flex flex-wrap gap-3">
+        {/* Category */}
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
@@ -64,6 +74,19 @@ export default function FoodListPage() {
           <option value="Bakery">Bakery</option>
         </select>
 
+        {/* ✅ Severity */}
+        <select
+          value={severity}
+          onChange={(e) => setSeverity(e.target.value)}
+          className="border rounded-md p-2 text-sm"
+        >
+          <option value="">All Severity</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+
+        {/* Start Date */}
         <input
           type="date"
           value={startDate}
@@ -71,6 +94,7 @@ export default function FoodListPage() {
           className="border rounded-md p-2 text-sm"
         />
 
+        {/* End Date */}
         <input
           type="date"
           value={endDate}
@@ -78,9 +102,11 @@ export default function FoodListPage() {
           className="border rounded-md p-2 text-sm"
         />
 
+        {/* Reset */}
         <button
           onClick={() => {
             setCategory("");
+            setSeverity(""); // ✅ NEW
             setStartDate("");
             setEndDate("");
           }}
@@ -110,13 +136,27 @@ export default function FoodListPage() {
                 <span className="text-xs text-muted-foreground">
                   Expires: {item.expiryDate}
                 </span>
+                {/* ✅ Show severity */}
+                <span className="text-xs">
+                  Severity: {item.severity}
+                </span>
               </div>
 
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[item.status]}`}
-              >
-                {item.status}
-              </span>
+              <div className="flex gap-2">
+                {/* Status */}
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${statusStyles[item.status]}`}
+                >
+                  {item.status}
+                </span>
+
+                {/* Severity badge */}
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${severityStyles[item.severity]}`}
+                >
+                  {item.severity}
+                </span>
+              </div>
             </div>
           ))
         )}
