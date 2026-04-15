@@ -98,24 +98,24 @@ describe("priority rules engine", () => {
       expect(calculatePriority(daysAgo(7), 7)).toBe("use-first")
     })
 
-    it("returns use-first for fresh produce regardless of age", () => {
-      expect(calculatePriority(FIXED_NOW, 5, "fresh produce")).toBe("use-first")
+    it("uses shelf life percentage for fresh produce (just added)", () => {
+      expect(calculatePriority(FIXED_NOW, 5)).toBe("use-later")
     })
 
-    it("returns use-first for meat regardless of age", () => {
-      expect(calculatePriority(FIXED_NOW, 5, "meat")).toBe("use-first")
+    it("uses shelf life percentage for meat (just added)", () => {
+      expect(calculatePriority(FIXED_NOW, 5)).toBe("use-later")
     })
 
-    it("returns use-first for fresh produce with mixed case", () => {
-      expect(calculatePriority(FIXED_NOW, 5, "Fresh Produce")).toBe("use-first")
+    it("returns use-first for fresh produce when shelf life is low", () => {
+      expect(calculatePriority(daysAgo(4), 5)).toBe("use-first")
     })
 
     it("does not force use-first for produce category", () => {
-      expect(calculatePriority(FIXED_NOW, 14, "produce")).toBe("use-later")
+      expect(calculatePriority(FIXED_NOW, 14)).toBe("use-later")
     })
 
     it("does not force use-first for other categories", () => {
-      expect(calculatePriority(FIXED_NOW, 7, "dairy")).toBe("use-later")
+      expect(calculatePriority(FIXED_NOW, 7)).toBe("use-later")
     })
   })
 

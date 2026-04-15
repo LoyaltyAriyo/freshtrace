@@ -81,7 +81,7 @@ export async function GET(request: Request) {
       category: toCategoryKey(item.category.name),
       quantity: String(item.quantity),
       addedDate: item.dateAdded.toISOString(),
-      priority: calculatePriority(item.dateAdded, item.category.shelfLifeDays, item.category.name) as ItemPriority,
+      priority: calculatePriority(item.dateAdded, item.category.shelfLifeDays) as ItemPriority,
       status: "active",
     }))
 

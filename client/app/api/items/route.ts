@@ -63,7 +63,7 @@ export async function GET() {
       status: item.status,
       categoryId: item.category.id,
       categoryName: item.category.name,
-      priority: calculatePriority(item.dateAdded, item.category.shelfLifeDays, item.category.name) as ItemPriority,
+      priority: calculatePriority(item.dateAdded, item.category.shelfLifeDays) as ItemPriority,
     }))
 
     return Response.json(payload)
