@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
 
+// ✅ Simple logger functions
+function logInfo(message: string) {
+  console.log(`[INFO] ${new Date().toISOString()} - ${message}`);
+}
+
+function logError(error: unknown) {
+  console.error(`[ERROR] ${new Date().toISOString()} -`, error);
+}
+
 const items = [
   { id: 1, name: "Milk", category: "Dairy", expiryDate: "2026-03-24", status: "expiring", severity: "medium" },
   { id: 2, name: "Chicken Breast", category: "Meat", expiryDate: "2026-03-23", status: "expiring", severity: "high" },
@@ -9,34 +18,47 @@ const items = [
 ];
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
+  try {
+    // ✅ Log API call
+    logInfo("GET /api/items called");
 
-  const category = searchParams.get("category");
-  const severity = searchParams.get("severity"); // ✅ NEW
-  const startDate = searchParams.get("startDate");
-  const endDate = searchParams.get("endDate");
+    const { searchParams } = new URL(req.url);
 
-  let filtered = items;
+    const category = searchParams.get("category");
+    const severity = searchParams.get("severity");
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
 
-  if (category) {
-    filtered = filtered.filter((item) => item.category === category);
-  }
+    let filtered = items;
 
-  if (severity) {
-    filtered = filtered.filter((item) => item.severity === severity);
-  }
+    if (category) {
+      filtered = filtered.filter((item) => item.category === category);
+    }
 
-  if (startDate) {
-    filtered = filtered.filter(
-      (item) => new Date(item.expiryDate) >= new Date(startDate)
+    if (severity) {
+      filtered = filtered.filter((item) => item.severity === severity);
+    }
+
+    if (startDate) {
+      filtered = filtered.filter(
+        (item) => new Date(item.expiryDate) >= new Date(startDate)
+      );
+    }
+
+    if (endDate) {
+      filtered = filtered.filter(
+        (item) => new Date(item.expiryDate) <= new Date(endDate)
+      );
+    }
+
+    return NextResponse.json(filtered);
+  } catch (error) {
+    // ✅ Log error
+    logError(error);
+
+    return NextResponse.json(
+      { message: "Internal Server Error" },
+      { status: 500 }
     );
   }
-
-  if (endDate) {
-    filtered = filtered.filter(
-      (item) => new Date(item.expiryDate) <= new Date(endDate)
-    );
-  }
-
-  return NextResponse.json(filtered);
 }
