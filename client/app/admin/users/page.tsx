@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -152,6 +153,21 @@ export default function AdminUsersPage() {
             </SelectContent>
           </Select>
         </div>
+        {filtersActive && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            data-testid="admin-users-clear-filters"
+            onClick={() => {
+              setSearchInput("")
+              setDebouncedSearch("")
+              setStatusFilter("all")
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
       </div>
 
       {error && (
