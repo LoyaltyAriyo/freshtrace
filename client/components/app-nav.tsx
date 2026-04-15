@@ -7,6 +7,7 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import {
   AlertTriangle,
+  BarChart3,
   Home,
   LayoutDashboard,
   ScanLine,
@@ -24,6 +25,7 @@ const userNav = [
 
 const adminNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/errors", label: "Error Logs", icon: AlertTriangle },
 ]

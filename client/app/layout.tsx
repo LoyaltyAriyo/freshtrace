@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
-import { AppNav } from "@/components/app-nav"
+import { ConditionalNav } from "@/components/conditional-nav"
 
 export const metadata: Metadata = {
   title: "Fresh Trace",
@@ -40,7 +40,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning className="font-sans antialiased">
         <div className="min-h-screen bg-background">
-          <AppNav />
+          <ConditionalNav />
           <main className="mx-auto max-w-6xl px-4 py-6 pb-24 md:pb-6">{children}</main>
         </div>
         <Toaster position="top-center" richColors />
