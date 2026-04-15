@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 
@@ -202,7 +203,15 @@ export default function AdminUsersPage() {
           <TableBody>
             {users.map((u) => (
               <TableRow key={u.id}>
-                <TableCell className="font-medium">{u.fullName}</TableCell>
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/admin/users/${u.id}`}
+                    className="hover:underline"
+                    aria-label={`View details for ${u.fullName}`}
+                  >
+                    {u.fullName}
+                  </Link>
+                </TableCell>
                 <TableCell>{u.email}</TableCell>
                 <TableCell>
                   <span
