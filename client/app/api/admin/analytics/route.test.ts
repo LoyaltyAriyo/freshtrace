@@ -123,9 +123,25 @@ describe("GET /api/admin/analytics", () => {
     expect(body.generatedAt).toBeDefined()
   })
 
+<<<<<<< Updated upstream
   // ── Waste Rate Calculation Tests ────────────────────────
 
   it("calculates waste rate correctly when items are disposed", async () => {
+=======
+  it("passes today range from query string", async () => {
+    requireAdminMock.mockResolvedValue({ ok: true })
+    getAdminAnalyticsReportMock.mockResolvedValue({
+      ...sampleReport,
+      range: "today",
+    })
+
+    await GET(new Request("http://localhost/api/admin/analytics?range=today"))
+
+    expect(getAdminAnalyticsReportMock).toHaveBeenCalledWith("today")
+  })
+
+  it("defaults invalid range to 7d for query parsing", async () => {
+>>>>>>> Stashed changes
     requireAdminMock.mockResolvedValue({ ok: true })
     foodItemCountMock.mockResolvedValue(50 as never)
     foodItemGroupByMock.mockResolvedValue([] as never)

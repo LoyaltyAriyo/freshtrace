@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import { describe, expect, it } from "vitest"
 import { parseTimeRange, resolveStartDate } from "./overview-metrics"
 
@@ -65,5 +66,55 @@ describe("resolveStartDate", () => {
 
     expect(diffDays).toBeGreaterThanOrEqual(29.9)
     expect(diffDays).toBeLessThanOrEqual(30.1)
+=======
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+
+import { parseTimeRange, resolveStartDate } from "./overview-metrics"
+
+const FIXED_NOW = new Date("2026-04-13T15:30:00.000Z")
+
+describe("parseTimeRange", () => {
+  it("accepts today, 7d, and 30d case-insensitively", () => {
+    expect(parseTimeRange("today")).toBe("today")
+    expect(parseTimeRange("TODAY")).toBe("today")
+    expect(parseTimeRange("7d")).toBe("7d")
+    expect(parseTimeRange("30D")).toBe("30d")
+  })
+
+  it("defaults invalid or empty values to 7d", () => {
+    expect(parseTimeRange(null)).toBe("7d")
+    expect(parseTimeRange("")).toBe("7d")
+    expect(parseTimeRange("year")).toBe("7d")
+  })
+})
+
+describe("resolveStartDate", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(FIXED_NOW)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("uses start of local day for today", () => {
+    const start = resolveStartDate("today")
+    const expected = new Date(FIXED_NOW)
+    expected.setHours(0, 0, 0, 0)
+    expect(start.getTime()).toBe(expected.getTime())
+  })
+
+  it("uses rolling 7 days for 7d", () => {
+    const start = resolveStartDate("7d")
+    const expected = new Date(FIXED_NOW.getTime() - 7 * 24 * 60 * 60 * 1000)
+    expect(start.getTime()).toBe(expected.getTime())
+  })
+
+  it("uses rolling 30 days for 30d", () => {
+    const start = resolveStartDate("30d")
+    const expected = new Date(FIXED_NOW.getTime() - 30 * 24 * 60 * 60 * 1000)
+    expect(start.getTime()).toBe(expected.getTime())
+>>>>>>> Stashed changes
   })
 })
