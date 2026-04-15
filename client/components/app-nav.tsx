@@ -5,7 +5,15 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { Home, LayoutDashboard, ScanLine, UtensilsCrossed, User, Users } from "lucide-react"
+import {
+  AlertTriangle,
+  Home,
+  LayoutDashboard,
+  ScanLine,
+  UtensilsCrossed,
+  User,
+  Users,
+} from "lucide-react"
 
 const userNav = [
   { href: "/", label: "Home", icon: Home },
@@ -17,6 +25,7 @@ const userNav = [
 const adminNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/errors", label: "Error Logs", icon: AlertTriangle },
 ]
 
 type AppNavProps = {
@@ -41,7 +50,7 @@ export function AppNav({ variant = "default" }: AppNavProps) {
     try {
       await fetch("/api/auth/logout", { method: "POST" })
     } catch {
-      // Minimal handling: ignore and still redirect.
+      // ignore and still redirect
     } finally {
       setSigningOut(false)
       window.location.href = "/login"
@@ -52,13 +61,14 @@ export function AppNav({ variant = "default" }: AppNavProps) {
     <>
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-1.5">
+          <Link href={variant === "admin" ? "/admin" : "/"} className="flex items-center gap-1.5">
             <Image
               src="/next.svg"
               alt="Fresh Trace"
               width={32}
               height={32}
               priority
+              style={{ height: "auto" }}
             />
             <span className="hidden text-sm font-semibold tracking-tight md:inline">
               Fresh Trace
