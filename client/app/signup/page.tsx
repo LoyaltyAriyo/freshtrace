@@ -3,6 +3,11 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { Eye, EyeOff } from "lucide-react"
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Something went wrong"
+}
 
 export default function SignupPage() {
   const router = useRouter()
@@ -10,8 +15,9 @@ export default function SignupPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -26,7 +32,6 @@ export default function SignupPage() {
     }
     setLoading(true)
     setError("")
-    setSuccess("")
     try {
       const response = await fetch("/api/auth/signup", {
         method: "POST",
@@ -53,8 +58,6 @@ export default function SignupPage() {
         return
       }
 
-      setSuccess("Account created successfully. Signing you in...")
-
       // Attempt automatic sign-in so the user lands on the correct dashboard.
       const loginResponse = await fetch("/api/auth/login", {
         method: "POST",
@@ -74,7 +77,6 @@ export default function SignupPage() {
             ? apiError
             : "Account created, but automatic sign-in failed. Please log in."
         )
-        setSuccess("")
         router.push("/login")
         return
       }
@@ -86,8 +88,8 @@ export default function SignupPage() {
       } else {
         router.push("/")
       }
-    } catch (error: any) {
-      setError(error?.message || "Something went wrong")
+    } catch (error: unknown) {
+      setError(getErrorMessage(error))
     } finally {
       setLoading(false)
     }
@@ -136,28 +138,54 @@ export default function SignupPage() {
 
           <div className="flex flex-col gap-1">
             <label htmlFor="password" className="text-sm font-medium">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              disabled={loading}
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-md border px-3 py-2 pr-10 text-sm outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((current) => !current)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground transition-colors hover:text-foreground"
+                disabled={loading}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-1">
             <label htmlFor="confirm" className="text-sm font-medium">Confirm Password</label>
-            <input
-              id="confirm"
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="••••••••"
-              className="rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              disabled={loading}
-            />
+            <div className="relative">
+              <input
+                id="confirm"
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-md border px-3 py-2 pr-10 text-sm outline-none focus:ring-2 focus:ring-primary"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                onClick={() => setShowConfirmPassword((current) => !current)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground transition-colors hover:text-foreground"
+                disabled={loading}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           <button

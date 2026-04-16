@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
+import { logError } from "@/lib/logger"
 import { getOverviewMetrics, parseTimeRange } from "@/lib/queries/overview-metrics"
 import { getExtendedMetrics } from "@/lib/queries/extended-metrics"
 
@@ -56,11 +57,16 @@ export async function GET(request: Request) {
       generatedAt: new Date().toISOString(),
     })
   } catch (error) {
-    console.error("Failed to load admin overview data:", error)
+    await logError({
+      message: "Failed to load admin overview data.",
+      error,
+      errorType: "ADMIN_OVERVIEW_FETCH_FAILED",
+      source: "DB",
+      details: { route: "GET /api/admin/overview" },
+    })
     return Response.json(
       { error: "Failed to load admin overview data." },
       { status: 500 }
     )
   }
 }
-

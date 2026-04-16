@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
+import { logError } from "@/lib/logger"
 import { buildNotification } from "@/lib/notifications"
 
 function mapNotificationType(type: "INFO" | "REMINDER" | "WARNING") {
@@ -76,7 +77,13 @@ export async function GET(request: Request) {
 
     return Response.json({ notifications, count: notifications.length })
   } catch (error) {
-    console.error("Failed to fetch notifications:", error)
+    await logError({
+      message: "Failed to fetch notifications.",
+      error,
+      errorType: "NOTIFICATIONS_FETCH_FAILED",
+      source: "API",
+      details: { route: "GET /api/notifications" },
+    })
     return Response.json(
       { error: "Failed to fetch notifications. Please try again." },
       { status: 500 }

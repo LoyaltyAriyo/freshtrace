@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import type { Prisma } from "@/generated/prisma-client"
 
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { logError } from "@/lib/logger"
 import { getAdminUserRecords } from "@/lib/queries/admin-users"
 
 const PAGE_SIZE_DEFAULT = 20
@@ -105,7 +106,13 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.error("Failed to list users:", error)
+    await logError({
+      message: "Failed to list users.",
+      error,
+      errorType: "ADMIN_USERS_FETCH_FAILED",
+      source: "DB",
+      details: { route: "GET /api/admin/users" },
+    })
     return NextResponse.json({ error: "Failed to load users." }, { status: 500 })
   }
 }

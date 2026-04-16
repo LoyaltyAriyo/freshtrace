@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
+import { logError } from "@/lib/logger"
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -46,7 +47,13 @@ export async function GET(request: Request, context: RouteContext) {
 
     return NextResponse.json(item)
   } catch (error) {
-    console.error("Failed to load item:", error)
+    await logError({
+      message: "Failed to load item.",
+      error,
+      errorType: "FOOD_ITEM_FETCH_FAILED",
+      source: "API",
+      details: { route: "GET /api/items/[id]" },
+    })
     return NextResponse.json({ error: "Failed to load item." }, { status: 500 })
   }
 }
@@ -125,7 +132,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Item not found." }, { status: 404 })
     }
 
-    console.error("Failed to update item:", error)
+    await logError({
+      message: "Failed to update item.",
+      error,
+      errorType: "FOOD_ITEM_UPDATE_FAILED",
+      source: "DB",
+      details: { route: "PATCH /api/items/[id]" },
+    })
     return NextResponse.json({ error: "Failed to update item." }, { status: 500 })
   }
 }

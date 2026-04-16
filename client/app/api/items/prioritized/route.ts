@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
+import { logError } from "@/lib/logger"
 import { calculatePriority } from "@/lib/priority"
 
 type ItemPriority = "use-first" | "use-soon" | "use-later"
@@ -92,7 +93,13 @@ export async function GET(request: Request) {
       useLater: prioritizedItems.filter((item) => item.priority === "use-later"),
     })
   } catch (error) {
-    console.error("Failed to fetch prioritized items:", error)
+    await logError({
+      message: "Failed to fetch prioritized items.",
+      error,
+      errorType: "PRIORITIZED_ITEMS_FETCH_FAILED",
+      source: "API",
+      details: { route: "GET /api/items/prioritized" },
+    })
     return Response.json(
       { error: "Failed to load prioritized items. Please try again." },
       { status: 500 }

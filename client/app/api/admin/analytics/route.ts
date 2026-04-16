@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { logError } from "@/lib/logger"
 import { getAdminAnalyticsReport } from "@/lib/queries/admin-analytics"
 import { parseTimeRange } from "@/lib/queries/overview-metrics"
 
@@ -21,7 +22,13 @@ export async function GET(request: Request) {
       generatedAt: new Date().toISOString(),
     })
   } catch (error) {
-    console.error("Failed to load admin analytics:", error)
+    await logError({
+      message: "Failed to load admin analytics.",
+      error,
+      errorType: "ADMIN_ANALYTICS_FETCH_FAILED",
+      source: "DB",
+      details: { route: "GET /api/admin/analytics" },
+    })
     return NextResponse.json(
       { error: "Failed to load analytics data." },
       { status: 500 },

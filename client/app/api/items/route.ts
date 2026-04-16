@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
+import { logError } from "@/lib/logger"
 import { calculatePriority } from "@/lib/priority"
 
 type ItemPriority = "use-first" | "use-soon" | "use-later"
@@ -79,7 +80,13 @@ export async function GET(request: Request) {
 
     return Response.json(payload)
   } catch (error) {
-    console.error("Failed to fetch food items:", error)
+    await logError({
+      message: "Failed to fetch food items.",
+      error,
+      errorType: "FOOD_ITEMS_FETCH_FAILED",
+      source: "API",
+      details: { route: "GET /api/items" },
+    })
     return serverError("Failed to load food items. Please try again.")
   }
 }
@@ -141,7 +148,13 @@ export async function POST(request: Request) {
 
     return Response.json(item, { status: 201 })
   } catch (error) {
-    console.error("Failed to create food item:", error)
+    await logError({
+      message: "Failed to create food item.",
+      error,
+      errorType: "FOOD_ITEM_CREATE_FAILED",
+      source: "DB",
+      details: { route: "POST /api/items", categoryId },
+    })
     return serverError("Failed to save item. Please try again.")
   }
 }

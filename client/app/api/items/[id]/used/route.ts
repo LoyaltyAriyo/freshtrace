@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
+import { logError } from "@/lib/logger"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -96,7 +97,13 @@ export async function POST(request: Request, { params }: Params) {
 
     return Response.json({ id: updated.id, status: updated.status, changed: true })
   } catch (error) {
-    console.error("Failed to mark item as used:", error)
+    await logError({
+      message: "Failed to mark item as used.",
+      error,
+      errorType: "FOOD_ITEM_MARK_USED_FAILED",
+      source: "DB",
+      details: { route: "POST /api/items/[id]/used", itemId: id },
+    })
     return Response.json(
       { error: "Failed to mark item as used. Please try again." },
       { status: 500 }

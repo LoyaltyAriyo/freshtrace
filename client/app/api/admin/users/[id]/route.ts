@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { requireAdmin } from "@/lib/auth/require-admin"
+import { logError } from "@/lib/logger"
 import { prisma } from "@/lib/prisma"
 
 type RouteContext = {
@@ -40,8 +41,13 @@ export async function GET(request: Request, context: RouteContext) {
       },
     })
   } catch (error) {
-    console.error("Failed to load user:", error)
+    await logError({
+      message: "Failed to load user.",
+      error,
+      errorType: "ADMIN_USER_FETCH_FAILED",
+      source: "DB",
+      details: { route: "GET /api/admin/users/[id]", userId: id },
+    })
     return NextResponse.json({ error: "Failed to load user." }, { status: 500 })
   }
 }
-

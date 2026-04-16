@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr"
 import { parse as parseCookie } from "cookie"
 
+import { logError } from "@/lib/logger"
+
 /**
  * Resolve the current authenticated Supabase user id for API routes.
  *
@@ -39,7 +41,15 @@ export async function getCurrentUserId(request: Request): Promise<string | null>
 
     return user?.id ?? null
   } catch (error) {
-    console.error("Failed to resolve current Supabase user in API route:", error)
+    await logError({
+      message: "Failed to resolve current Supabase user in API route.",
+      error,
+      errorType: "AUTH_USER_RESOLUTION_FAILED",
+      source: "AUTH",
+      details: {
+        hasCookieHeader: cookieHeader.length > 0,
+      },
+    })
     return null
   }
 }

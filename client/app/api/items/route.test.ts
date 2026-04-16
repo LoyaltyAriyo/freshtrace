@@ -27,15 +27,23 @@ vi.mock("@/lib/auth", () => {
   }
 })
 
+vi.mock("@/lib/logger", () => ({
+  logError: vi.fn(),
+}))
+
 import { GET, POST } from "./route"
 // @ts-expect-error - test-only mocked exports
 import { findManyMock, findUniqueMock, createMock } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth"
+import { logError } from "@/lib/logger"
+
+const logErrorMock = vi.mocked(logError)
 
 describe("GET /api/items", () => {
   beforeEach(() => {
     findManyMock.mockReset()
     vi.mocked(getCurrentUserId).mockResolvedValue("user-123")
+    logErrorMock.mockReset()
   })
 
   it("returns active items with category and priority", async () => {
@@ -86,6 +94,12 @@ describe("GET /api/items", () => {
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body.error).toMatch(/failed to load food items/i)
+    expect(logError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Failed to fetch food items.",
+        errorType: "FOOD_ITEMS_FETCH_FAILED",
+      }),
+    )
   })
 
   it("returns 401 when user is not authenticated", async () => {
@@ -105,6 +119,7 @@ describe("POST /api/items", () => {
     findUniqueMock.mockReset()
     createMock.mockReset()
     vi.mocked(getCurrentUserId).mockResolvedValue("user-123")
+    logErrorMock.mockReset()
   })
 
   function makeRequest(body: unknown) {
@@ -212,6 +227,12 @@ describe("POST /api/items", () => {
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body.error).toMatch(/failed to save/i)
+    expect(logError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Failed to create food item.",
+        errorType: "FOOD_ITEM_CREATE_FAILED",
+      }),
+    )
   })
 
   it("trims the item name before saving", async () => {

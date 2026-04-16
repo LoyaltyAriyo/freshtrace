@@ -4,6 +4,7 @@ import { ensureCategories, findCategoryIdForItemName } from "@/lib/category-util
 import { extractReceiptDraftItems } from "@/lib/ocr"
 import { supabaseAdmin } from "@/lib/supabase/server"
 import { getCurrentUserId } from "@/lib/auth"
+import { logError } from "@/lib/logger"
 
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
@@ -38,7 +39,13 @@ async function downloadReceiptObjectBytes(objectPath: string): Promise<Uint8Arra
     .download(objectPath)
 
   if (error || !data) {
-    console.error("Supabase Storage download error:", error)
+    await logError({
+      message: "Failed to download receipt image from storage.",
+      error: error ?? new Error("Supabase Storage returned no data."),
+      errorType: "RECEIPT_STORAGE_DOWNLOAD_FAILED",
+      source: "API",
+      details: { objectPath, bucket: RECEIPTS_BUCKET },
+    })
     return null
   }
 
@@ -95,7 +102,13 @@ export async function POST(request: Request) {
       })
 
     if (uploadError) {
-      console.error("Supabase Storage upload error:", uploadError)
+      await logError({
+        message: "Failed to upload receipt image to storage.",
+        error: uploadError,
+        errorType: "RECEIPT_STORAGE_UPLOAD_FAILED",
+        source: "API",
+        details: { objectPath, bucket: RECEIPTS_BUCKET, mimeType: file.type || null },
+      })
       return Response.json(
         { error: "Failed to store receipt image." },
         { status: 500 }
@@ -143,7 +156,14 @@ export async function POST(request: Request) {
           finalStatus = "FAILED"
         }
       } catch (ocrError) {
-        console.error("OCR extraction failed:", ocrError)
+        await logError({
+          message: "OCR extraction failed.",
+          error: ocrError,
+          errorType: "OCR_FAILURE",
+          source: "OCR",
+          severity: "WARNING",
+          details: { receiptId: receipt.id, objectPath },
+        })
         finalStatus = "FAILED"
       }
 
@@ -159,14 +179,27 @@ export async function POST(request: Request) {
         { status: 201 }
       )
     } catch (dbError) {
-      console.error("Error creating receipt record:", dbError)
+      await logError({
+        message: "Error creating receipt record.",
+        error: dbError,
+        errorType: "RECEIPT_RECORD_CREATE_FAILED",
+        source: "DB",
+        details: { objectPath },
+      })
 
       const { error: removeError } = await supabaseAdmin.storage
         .from(RECEIPTS_BUCKET)
         .remove([objectPath])
 
       if (removeError) {
-        console.error("Supabase Storage cleanup error:", removeError)
+        await logError({
+          message: "Failed to clean up receipt image after receipt save error.",
+          error: removeError,
+          errorType: "RECEIPT_STORAGE_CLEANUP_FAILED",
+          source: "API",
+          severity: "WARNING",
+          details: { objectPath, bucket: RECEIPTS_BUCKET },
+        })
       }
 
       return Response.json(
@@ -175,7 +208,13 @@ export async function POST(request: Request) {
       )
     }
   } catch (error) {
-    console.error("Error handling receipt upload:", error)
+    await logError({
+      message: "Error handling receipt upload.",
+      error,
+      errorType: "RECEIPT_UPLOAD_FAILED",
+      source: "API",
+      details: { route: "POST /api/receipts" },
+    })
     return Response.json(
       { error: "Failed to process receipt upload." },
       { status: 500 }

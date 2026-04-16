@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { logError } from "@/lib/logger"
 
 function getDateFrom(range: string): Date | null {
   const now = new Date()
@@ -86,7 +87,13 @@ export async function GET(request: Request) {
       topCategories: topCategoriesFormatted,
     })
   } catch (error) {
-    console.error("Failed to fetch analytics:", error)
+    await logError({
+      message: "Failed to fetch analytics.",
+      error,
+      errorType: "ANALYTICS_FETCH_FAILED",
+      source: "DB",
+      details: { route: "GET /api/analytics" },
+    })
     return Response.json(
       { error: "Failed to fetch analytics. Please try again." },
       { status: 500 }

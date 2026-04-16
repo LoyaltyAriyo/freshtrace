@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { ensureCategories } from "@/lib/category-utils"
 import { getCurrentUserId } from "@/lib/auth"
+import { logError } from "@/lib/logger"
 
 type Params = { params: Promise<{ id: string }> }
 type EditedItemInput = {
@@ -344,7 +345,13 @@ export async function POST(request: Request, { params }: Params) {
 
     return Response.json({ savedCount: result.count }, { status: 201 })
   } catch (error) {
-    console.error("Failed to save food items from review:", error)
+    await logError({
+      message: "Failed to save food items from review.",
+      error,
+      errorType: "RECEIPT_REVIEW_SAVE_FAILED",
+      source: "DB",
+      details: { route: "POST /api/receipts/[id]/review", receiptId: receipt.id },
+    })
     return Response.json(
       { error: "Failed to save items. Please try again." },
       { status: 500 }
