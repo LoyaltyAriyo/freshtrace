@@ -10,6 +10,55 @@ describe("HomePage priority overview", () => {
     vi.restoreAllMocks()
   })
 
+  it("loads notifications for the recent alerts section", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((input: string | URL | Request) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url
+
+        if (url.includes("/api/items/prioritized")) {
+          return Promise.resolve({
+            ok: true,
+            json: vi.fn().mockResolvedValue({
+              items: [],
+              useFirst: [],
+              useSoon: [],
+              useLater: [],
+            }),
+          })
+        }
+
+        if (url.includes("/api/notifications")) {
+          return Promise.resolve({
+            ok: true,
+            json: vi.fn().mockResolvedValue({
+              notifications: [
+                {
+                  id: "notif-1",
+                  message: "You marked Milk as used.",
+                  timestamp: "2026-04-07T12:00:00.000Z",
+                  type: "info",
+                  read: false,
+                },
+              ],
+            }),
+          })
+        }
+
+        return Promise.reject(new Error(`Unexpected fetch url: ${url}`))
+      })
+    )
+
+    render(<HomePage />)
+
+    expect(await screen.findByText("You marked Milk as used.")).toBeInTheDocument()
+  })
+
   it("loads prioritized items from backend", async () => {
     vi.stubGlobal(
       "fetch",

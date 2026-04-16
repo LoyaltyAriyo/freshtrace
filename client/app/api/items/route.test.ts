@@ -21,13 +21,21 @@ vi.mock("@/lib/prisma", () => {
   }
 })
 
+vi.mock("@/lib/auth", () => {
+  return {
+    getCurrentUserId: vi.fn().mockResolvedValue("user-123"),
+  }
+})
+
 import { GET, POST } from "./route"
 // @ts-expect-error - test-only mocked exports
 import { findManyMock, findUniqueMock, createMock } from "@/lib/prisma"
+import { getCurrentUserId } from "@/lib/auth"
 
 describe("GET /api/items", () => {
   beforeEach(() => {
     findManyMock.mockReset()
+    vi.mocked(getCurrentUserId).mockResolvedValue("user-123")
   })
 
   it("returns active items with category and priority", async () => {
@@ -42,7 +50,7 @@ describe("GET /api/items", () => {
       },
     ])
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/items"))
 
     expect(response.status).toBe(200)
     const body = await response.json()
@@ -61,11 +69,11 @@ describe("GET /api/items", () => {
   it("queries only ACTIVE items from Prisma", async () => {
     findManyMock.mockResolvedValue([])
 
-    await GET()
+    await GET(new Request("http://localhost/api/items"))
 
     expect(findManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { status: "ACTIVE" },
+        where: { status: "ACTIVE", userId: "user-123" },
       }),
     )
   })
@@ -73,11 +81,22 @@ describe("GET /api/items", () => {
   it("returns 500 when loading items fails", async () => {
     findManyMock.mockRejectedValue(new Error("db down"))
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/items"))
 
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body.error).toMatch(/failed to load food items/i)
+  })
+
+  it("returns 401 when user is not authenticated", async () => {
+    vi.mocked(getCurrentUserId).mockResolvedValue(null)
+
+    const response = await GET(new Request("http://localhost/api/items"))
+    const body = await response.json()
+
+    expect(response.status).toBe(401)
+    expect(body.error).toMatch(/signed in/i)
+    expect(findManyMock).not.toHaveBeenCalled()
   })
 })
 
@@ -85,6 +104,7 @@ describe("POST /api/items", () => {
   beforeEach(() => {
     findUniqueMock.mockReset()
     createMock.mockReset()
+    vi.mocked(getCurrentUserId).mockResolvedValue("user-123")
   })
 
   function makeRequest(body: unknown) {
@@ -111,9 +131,26 @@ describe("POST /api/items", () => {
     expect(body).toMatchObject({ id: "item-1", name: "Milk", quantity: 2, categoryId: "cat-1" })
     expect(createMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ name: "Milk", quantity: 2, categoryId: "cat-1", source: "MANUAL" }),
+        data: expect.objectContaining({
+          name: "Milk",
+          quantity: 2,
+          categoryId: "cat-1",
+          source: "MANUAL",
+          userId: "user-123",
+        }),
       }),
     )
+  })
+
+  it("returns 401 when user is not authenticated", async () => {
+    vi.mocked(getCurrentUserId).mockResolvedValue(null)
+
+    const response = await POST(makeRequest({ name: "Milk", quantity: 2, categoryId: "cat-1" }))
+    const body = await response.json()
+
+    expect(response.status).toBe(401)
+    expect(body.error).toMatch(/signed in/i)
+    expect(createMock).not.toHaveBeenCalled()
   })
 
   it("returns 400 when name is missing", async () => {
@@ -193,7 +230,13 @@ describe("POST /api/items", () => {
 
     expect(createMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ name: "Milk", quantity: 2, categoryId: "cat-1", source: "MANUAL" }),
+        data: expect.objectContaining({
+          name: "Milk",
+          quantity: 2,
+          categoryId: "cat-1",
+          source: "MANUAL",
+          userId: "user-123",
+        }),
       }),
     )
   })

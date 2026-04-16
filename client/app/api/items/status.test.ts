@@ -6,6 +6,7 @@ vi.mock("@/lib/prisma", () => {
   const findManyMock = vi.fn()
   const upsertUsedItemMock = vi.fn()
   const upsertWastedItemMock = vi.fn()
+  const createNotificationMock = vi.fn()
   const transactionMock = vi.fn()
 
   return {
@@ -21,6 +22,9 @@ vi.mock("@/lib/prisma", () => {
       wastedItem: {
         upsert: upsertWastedItemMock,
       },
+      notification: {
+        create: createNotificationMock,
+      },
       $transaction: transactionMock,
     },
     findUniqueMock,
@@ -28,6 +32,7 @@ vi.mock("@/lib/prisma", () => {
     findManyMock,
     upsertUsedItemMock,
     upsertWastedItemMock,
+    createNotificationMock,
     transactionMock,
   }
 })
@@ -43,6 +48,7 @@ import { POST as markItemUsed } from "./[id]/used/route"
 import { POST as markItemWasted } from "./[id]/wasted/route"
 // @ts-expect-error - test-only mocked exports
 import {
+  createNotificationMock,
   findUniqueMock,
   updateMock,
   findManyMock,
@@ -62,6 +68,7 @@ describe("Food item status updates (USED/WASTED)", () => {
     findManyMock.mockReset()
     upsertUsedItemMock.mockReset()
     upsertWastedItemMock.mockReset()
+    createNotificationMock.mockReset()
     transactionMock.mockReset()
   })
 
@@ -83,6 +90,7 @@ describe("Food item status updates (USED/WASTED)", () => {
     })
 
     upsertUsedItemMock.mockResolvedValue({ id: "used-1" })
+    createNotificationMock.mockResolvedValue({ id: "notification-1" })
     transactionMock.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops))
 
     const response = await markItemUsed(
@@ -124,6 +132,7 @@ describe("Food item status updates (USED/WASTED)", () => {
     })
 
     upsertWastedItemMock.mockResolvedValue({ id: "wasted-1" })
+    createNotificationMock.mockResolvedValue({ id: "notification-1" })
     transactionMock.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops))
 
     const response = await markItemWasted(
@@ -241,6 +250,7 @@ describe("Food item status updates (USED/WASTED)", () => {
       status: "USED",
     })
     upsertUsedItemMock.mockResolvedValue({ id: "used-3" })
+    createNotificationMock.mockResolvedValue({ id: "notification-1" })
     transactionMock.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops))
 
     await markItemUsed(

@@ -4,6 +4,7 @@ vi.mock("@/lib/prisma", () => {
   const findUniqueMock = vi.fn()
   const updateMock = vi.fn()
   const upsertMock = vi.fn()
+  const createNotificationMock = vi.fn()
   const transactionMock = vi.fn()
 
   return {
@@ -15,11 +16,15 @@ vi.mock("@/lib/prisma", () => {
       wastedItem: {
         upsert: upsertMock,
       },
+      notification: {
+        create: createNotificationMock,
+      },
       $transaction: transactionMock,
     },
     findUniqueMock,
     updateMock,
     upsertMock,
+    createNotificationMock,
     transactionMock,
   }
 })
@@ -32,7 +37,13 @@ vi.mock("@/lib/auth", () => {
 
 import { POST } from "./route"
 // @ts-expect-error - test-only mocked exports
-import { findUniqueMock, updateMock, upsertMock, transactionMock } from "@/lib/prisma"
+import {
+  createNotificationMock,
+  findUniqueMock,
+  updateMock,
+  upsertMock,
+  transactionMock,
+} from "@/lib/prisma"
 
 function makeParams(id: string) {
   return { params: Promise.resolve({ id }) }
@@ -43,7 +54,9 @@ describe("POST /api/items/[id]/wasted", () => {
     findUniqueMock.mockReset()
     updateMock.mockReset()
     upsertMock.mockReset()
+    createNotificationMock.mockReset()
     transactionMock.mockReset()
+    createNotificationMock.mockResolvedValue({ id: "notification-1" })
   })
 
   it("returns 404 when item does not exist", async () => {
@@ -82,6 +95,15 @@ describe("POST /api/items/[id]/wasted", () => {
     // Ensure the route actually attempts to persist the wasted-item history entry.
     expect(updateMock).toHaveBeenCalledTimes(1)
     expect(upsertMock).toHaveBeenCalledTimes(1)
+    expect(createNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "user-123",
+          foodItemId: "item-1",
+          type: "WARNING",
+        }),
+      })
+    )
   })
 
   it("returns changed=false when item is already wasted", async () => {

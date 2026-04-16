@@ -4,6 +4,7 @@ vi.mock("@/lib/prisma", () => {
   const findUniqueMock = vi.fn()
   const updateMock = vi.fn()
   const upsertUsedItemMock = vi.fn()
+  const createNotificationMock = vi.fn()
   const transactionMock = vi.fn()
 
   return {
@@ -15,11 +16,15 @@ vi.mock("@/lib/prisma", () => {
       usedItem: {
         upsert: upsertUsedItemMock,
       },
+      notification: {
+        create: createNotificationMock,
+      },
       $transaction: transactionMock,
     },
     findUniqueMock,
     updateMock,
     upsertUsedItemMock,
+    createNotificationMock,
     transactionMock,
   }
 })
@@ -32,7 +37,13 @@ vi.mock("@/lib/auth", () => {
 
 import { POST } from "./route"
 // @ts-expect-error - test-only mocked exports
-import { findUniqueMock, updateMock, upsertUsedItemMock, transactionMock } from "@/lib/prisma"
+import {
+  createNotificationMock,
+  findUniqueMock,
+  updateMock,
+  upsertUsedItemMock,
+  transactionMock,
+} from "@/lib/prisma"
 
 function makeParams(id: string) {
   return { params: Promise.resolve({ id }) }
@@ -43,10 +54,12 @@ describe("POST /api/items/[id]/used", () => {
     findUniqueMock.mockReset()
     updateMock.mockReset()
     upsertUsedItemMock.mockReset()
+    createNotificationMock.mockReset()
     transactionMock.mockReset()
 
     updateMock.mockResolvedValue({ id: "item-1", status: "USED" })
     upsertUsedItemMock.mockResolvedValue({ id: "used-1" })
+    createNotificationMock.mockResolvedValue({ id: "notification-1" })
     transactionMock.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops))
   })
 
@@ -83,6 +96,15 @@ describe("POST /api/items/[id]/used", () => {
     })
     expect(updateMock).toHaveBeenCalledTimes(1)
     expect(upsertUsedItemMock).toHaveBeenCalledTimes(1)
+    expect(createNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "user-123",
+          foodItemId: "item-1",
+          type: "INFO",
+        }),
+      })
+    )
     expect(transactionMock).toHaveBeenCalledTimes(1)
   })
 

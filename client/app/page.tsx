@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { PrioritySection } from "@/components/priority-section"
 import { RecentAlerts } from "@/components/recent-alerts"
-import type { FoodItem } from "@/lib/data"
+import type { Alert as DashboardAlert, FoodItem } from "@/lib/data"
 import { Loader2, Plus, ScanLine } from "lucide-react"
 import MetricCard from "@/components/ui/metric-card"
 
@@ -17,6 +17,10 @@ type PrioritizedResponse = {
   useLater: FoodItem[]
 }
 
+type NotificationsResponse = {
+  notifications?: DashboardAlert[]
+}
+
 export default function HomePage() {
   const [priorityData, setPriorityData] = useState<PrioritizedResponse>({
     items: [],
@@ -25,7 +29,7 @@ export default function HomePage() {
     useLater: [],
   })
 
-  const [alerts, setAlerts] = useState<any[]>([]) // ✅ NEW
+  const [alerts, setAlerts] = useState<DashboardAlert[]>([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -66,10 +70,15 @@ export default function HomePage() {
 
     async function loadAlerts() {
       try {
-        const res = await fetch("/api/alerts")
-        const data = await res.json()
+        const res = await fetch("/api/notifications")
+        const data = (await res.json().catch(() => null)) as NotificationsResponse | null
+
+        if (!res.ok) {
+          throw new Error("Failed to load notifications.")
+        }
+
         if (!cancelled) {
-          setAlerts(Array.isArray(data) ? data : [])
+          setAlerts(Array.isArray(data?.notifications) ? data.notifications : [])
         }
       } catch {
         if (!cancelled) {

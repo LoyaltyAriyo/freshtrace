@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getCurrentUserId } from "@/lib/auth"
 import { calculatePriority } from "@/lib/priority"
 
 type ItemPriority = "use-first" | "use-soon" | "use-later"
@@ -30,11 +31,21 @@ function serverError(message: string) {
   return Response.json({ error: message }, { status: 500 })
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const userId = await getCurrentUserId(request)
+
+    if (!userId) {
+      return Response.json(
+        { error: "You must be signed in to view food items." },
+        { status: 401 }
+      )
+    }
+
     const items = await prisma.foodItem.findMany({
       where: {
         status: "ACTIVE",
+        userId,
       },
       orderBy: {
         dateAdded: "desc",
@@ -74,6 +85,15 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const userId = await getCurrentUserId(request)
+
+  if (!userId) {
+    return Response.json(
+      { error: "You must be signed in to create food items." },
+      { status: 401 }
+    )
+  }
+
   let body: unknown
   try {
     body = await request.json()
@@ -109,6 +129,7 @@ export async function POST(request: Request) {
         quantity: parsedQuantity,
         categoryId,
         source: "MANUAL",
+        userId,
       },
       select: {
         id: true,

@@ -2,19 +2,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("@/lib/prisma", () => {
   const findManyMock = vi.fn()
+  const notificationFindManyMock = vi.fn()
   return {
     prisma: {
       foodItem: {
         findMany: findManyMock,
       },
+      notification: {
+        findMany: notificationFindManyMock,
+      },
     },
     findManyMock,
+    notificationFindManyMock,
+  }
+})
+
+vi.mock("@/lib/auth", () => {
+  return {
+    getCurrentUserId: vi.fn().mockResolvedValue("user-123"),
   }
 })
 
 import { GET } from "./route"
 // @ts-expect-error - test-only mocked export
-import { findManyMock } from "@/lib/prisma"
+import { findManyMock, notificationFindManyMock } from "@/lib/prisma"
+import { getCurrentUserId } from "@/lib/auth"
 
 const FIXED_NOW = new Date("2026-04-07T12:00:00.000Z")
 
@@ -27,6 +39,9 @@ function daysAgo(days: number): Date {
 describe("GET /api/notifications", () => {
   beforeEach(() => {
     findManyMock.mockReset()
+    notificationFindManyMock.mockReset()
+    vi.mocked(getCurrentUserId).mockResolvedValue("user-123")
+    notificationFindManyMock.mockResolvedValue([])
     vi.setSystemTime(FIXED_NOW)
   })
 
@@ -39,7 +54,7 @@ describe("GET /api/notifications", () => {
       { id: "item-1", name: "Milk", dateAdded: daysAgo(1), category: { name: "Dairy" } },
     ])
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/notifications"))
     const body = await response.json()
 
     expect(response.status).toBe(200)
@@ -52,7 +67,7 @@ describe("GET /api/notifications", () => {
       { id: "item-1", name: "Chicken", dateAdded: daysAgo(10), category: { name: "Meat" } },
     ])
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/notifications"))
     const body = await response.json()
 
     expect(response.status).toBe(200)
@@ -68,7 +83,7 @@ describe("GET /api/notifications", () => {
       { id: "item-2", name: "Salmon", dateAdded: daysAgo(2), category: { name: "Meat" } },
     ])
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/notifications"))
     const body = await response.json()
 
     expect(response.status).toBe(200)
@@ -84,7 +99,7 @@ describe("GET /api/notifications", () => {
       { id: "item-3", name: "Yogurt", dateAdded: daysAgo(6), category: { name: "Dairy" } },
     ])
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/notifications"))
     const body = await response.json()
 
     expect(response.status).toBe(200)
@@ -99,7 +114,7 @@ describe("GET /api/notifications", () => {
       { id: "item-4", name: "Rice", dateAdded: daysAgo(1), category: { name: "Pantry" } },
     ])
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/notifications"))
     const body = await response.json()
 
     expect(response.status).toBe(200)
@@ -113,7 +128,7 @@ describe("GET /api/notifications", () => {
       { id: "item-3", name: "Salmon", dateAdded: daysAgo(2), category: { name: "Seafood" } },
     ])
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/notifications"))
     const body = await response.json()
 
     expect(response.status).toBe(200)
@@ -124,10 +139,61 @@ describe("GET /api/notifications", () => {
   it("returns 500 when database query fails", async () => {
     findManyMock.mockRejectedValue(new Error("DB error"))
 
-    const response = await GET()
+    const response = await GET(new Request("http://localhost/api/notifications"))
     const body = await response.json()
 
     expect(response.status).toBe(500)
     expect(body.error).toMatch(/failed to fetch notifications/i)
+  })
+
+  it("returns 401 when user is not authenticated", async () => {
+    vi.mocked(getCurrentUserId).mockResolvedValue(null)
+
+    const response = await GET(new Request("http://localhost/api/notifications"))
+    const body = await response.json()
+
+    expect(response.status).toBe(401)
+    expect(body.error).toMatch(/signed in/i)
+    expect(findManyMock).not.toHaveBeenCalled()
+  })
+
+  it("includes persisted notifications and sorts them newest first", async () => {
+    findManyMock.mockResolvedValue([
+      { id: "item-1", name: "Chicken", dateAdded: daysAgo(10), category: { name: "Meat" } },
+    ])
+    notificationFindManyMock.mockResolvedValue([
+      {
+        id: "notif-1",
+        message: "You marked Milk as used.",
+        type: "INFO",
+        isRead: false,
+        createdAt: new Date("2026-04-07T14:00:00.000Z"),
+      },
+    ])
+
+    const response = await GET(new Request("http://localhost/api/notifications"))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.notifications).toHaveLength(2)
+    expect(body.notifications[0]).toMatchObject({
+      id: "notif-1",
+      message: "You marked Milk as used.",
+      type: "info",
+      read: false,
+    })
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: "ACTIVE",
+          userId: "user-123",
+        }),
+      })
+    )
+    expect(notificationFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-123" },
+      })
+    )
   })
 })

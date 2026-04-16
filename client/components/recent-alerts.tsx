@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { Alert } from "@/lib/data"
@@ -23,6 +23,10 @@ const alertStyles = {
 export function RecentAlerts({ alerts }: { alerts: Alert[] }) {
   const [visibleAlerts, setVisibleAlerts] = useState<Alert[]>(alerts)
   const recent = visibleAlerts.slice(0, 4)
+
+  useEffect(() => {
+    setVisibleAlerts(alerts)
+  }, [alerts])
 
   function dismissAlert(id: string) {
     setVisibleAlerts((prev) => prev.filter((alert) => alert.id !== id))

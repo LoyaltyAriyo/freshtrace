@@ -81,6 +81,17 @@ export async function POST(request: Request, { params }: Params) {
           id: true,
         },
       }),
+      prisma.notification.create({
+        data: {
+          userId,
+          foodItemId: existing.id,
+          message: `You marked ${existing.name} as used.`,
+          type: "INFO",
+        },
+        select: {
+          id: true,
+        },
+      }),
     ])
 
     return Response.json({ id: updated.id, status: updated.status, changed: true })
