@@ -3,7 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { SignOutButton } from "@/components/sign-out-button"
 import { cn } from "@/lib/utils"
 import {
   AlertTriangle,
@@ -11,6 +11,7 @@ import {
   Home,
   LayoutDashboard,
   ScanLine,
+  SquarePen,
   UtensilsCrossed,
   User,
   Users,
@@ -20,7 +21,8 @@ const userNav = [
   { href: "/", label: "Home", icon: Home },
   { href: "/scan", label: "Scan", icon: ScanLine },
   { href: "/food-list", label: "Food List", icon: UtensilsCrossed },
-  { href: "/manual-entry", label: "Manual Entry", icon: User },
+  { href: "/manual-entry", label: "Manual Entry", icon: SquarePen },
+  { href: "/account", label: "Account", icon: User },
 ]
 
 const adminNav = [
@@ -36,7 +38,6 @@ type AppNavProps = {
 
 export function AppNav({ variant = "default" }: AppNavProps) {
   const pathname = usePathname()
-  const [signingOut, setSigningOut] = useState(false)
 
   const navItems = variant === "admin" ? adminNav : userNav
 
@@ -44,19 +45,6 @@ export function AppNav({ variant = "default" }: AppNavProps) {
     if (href === "/") return pathname === href
     if (href === "/admin") return pathname === "/admin"
     return pathname === href || pathname.startsWith(`${href}/`)
-  }
-
-  async function handleSignOut() {
-    if (signingOut) return
-    setSigningOut(true)
-    try {
-      await fetch("/api/auth/logout", { method: "POST" })
-    } catch {
-      // ignore and still redirect
-    } finally {
-      setSigningOut(false)
-      window.location.href = "/login"
-    }
   }
 
   return (
@@ -97,17 +85,12 @@ export function AppNav({ variant = "default" }: AppNavProps) {
                 </Link>
               )
             })}
-            <button
-              type="button"
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className={cn(
-                "ml-2 flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                "text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
-              )}
-            >
-              {signingOut ? "Signing out..." : "Sign out"}
-            </button>
+            {variant === "admin" ? (
+              <SignOutButton
+                variant="ghost"
+                className="h-auto w-auto rounded-md px-3 py-2 text-sm font-medium shadow-none hover:bg-accent hover:text-accent-foreground"
+              />
+            ) : null}
           </nav>
         </div>
       </header>
