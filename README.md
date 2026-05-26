@@ -102,7 +102,7 @@ Repository structure:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/T5-W26-COMP231/T5-W26-COMP231.git
+git clone https://github.com/T5-W26-COMP231/freshtrace.git
 cd T5-W26-COMP231
 ```
 
