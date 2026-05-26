@@ -103,7 +103,6 @@ Repository structure:
 
 ```bash
 git clone https://github.com/T5-W26-COMP231/freshtrace.git
-cd T5-W26-COMP231
 ```
 
 2. Install frontend dependencies:
