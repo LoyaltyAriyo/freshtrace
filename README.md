@@ -12,15 +12,45 @@ FreshTrace was built collaboratively by an Agile Scrum team, with work organized
 
 ## Demo / Screenshots
 
-Demo and screenshots will be added soon.
+Release 1 demo video:
 
-Suggested screenshots:
+- [Watch on YouTube](https://www.youtube.com/watch?v=4BHFCCdKifU)
 
-- Dashboard
-- Receipt upload workflow
-- Food priority overview
-- Manual item entry
-- Admin analytics dashboard
+### Dashboard Overview
+
+Demonstrates the main user dashboard experience and the core inventory-focused interface.
+
+![Dashboard Overview](asset/screenshots/home-dashboard.png)
+
+### Account Management Interface
+
+Demonstrates the user account area and profile-oriented workflow within the application.
+
+![Account Management Interface](asset/screenshots/account-page.png)
+
+### Admin Analytics Overview
+
+Demonstrates the high-level admin analytics dashboard used for operational visibility and reporting.
+
+![Admin Analytics Overview](asset/screenshots/admin-overview.png)
+
+### Admin User Management Section
+
+Demonstrates the administrative user management view and role-aware workflow support.
+
+![Admin User Management Section](asset/screenshots/admin-user-section.png)
+
+### Error Log Monitoring
+
+Demonstrates the admin-facing error log view used to review and monitor application issues.
+
+![Error Log Monitoring](asset/screenshots/error-logs.png)
+
+### Weekly Reporting View
+
+Demonstrates the reporting experience for reviewing weekly metrics and summary insights.
+
+![Weekly Reporting View](asset/screenshots/weekly-reports.png)
 
 ## Features
 
