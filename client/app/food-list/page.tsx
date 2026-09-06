@@ -7,6 +7,9 @@ import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { CategoryDropdown } from "@/components/category-dropdown"
+import { ItemHistoryList } from "@/components/item-history-list"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import type { HistoryStatus } from "@/lib/item-history"
 import {
   Dialog,
   DialogContent,
@@ -44,7 +47,7 @@ const priorityStyles: Record<string, string> = {
 // reference.  The canonical types now live in @/lib/validations.
 type EditFieldErrors = ItemFieldErrors
 
-function FoodListPageContent() {
+function ActiveFoodList({ onItemMarked }: { onItemMarked: (status: HistoryStatus) => void }) {
   const searchParams = useSearchParams()
   const editNameErrorId = useId()
   const editQuantityErrorId = useId()
@@ -66,6 +69,9 @@ function FoodListPageContent() {
     message: string
   } | null>(null)
   const [editDialogError, setEditDialogError] = useState("")
+  const mounted = useRef(false)
+  const activeRequest = useRef<AbortController | null>(null)
+  const actionInFlight = useRef(false)
 
   // Auto-dismiss page-level success feedback after 5 seconds
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -96,12 +102,17 @@ function FoodListPageContent() {
   }, [])
 
   async function loadItems() {
+    if (!mounted.current) return
+    activeRequest.current?.abort()
+    const controller = new AbortController()
+    activeRequest.current = controller
     setLoading(true)
     setError("")
 
     try {
-      const response = await fetch("/api/items")
+      const response = await fetch("/api/items", { signal: controller.signal })
       const data = await response.json().catch(() => null)
+      if (!mounted.current || controller.signal.aborted) return
 
       if (!response.ok) {
         throw new Error(data?.error || "Failed to load food items.")
@@ -141,23 +152,18 @@ function FoodListPageContent() {
       setItems(normalized)
       setLoading(false)
     } catch (err) {
+      if (!mounted.current || controller.signal.aborted) return
       setError(err instanceof Error ? err.message : "Failed to load food items.")
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    let cancelled = false
-
-    async function loadItemsSafe() {
-      await loadItems()
-      if (cancelled) return
-    }
-
-    loadItemsSafe()
-
+    mounted.current = true
+    void loadItems()
     return () => {
-      cancelled = true
+      mounted.current = false
+      activeRequest.current?.abort()
     }
   }, [])
 
@@ -176,6 +182,8 @@ function FoodListPageContent() {
   }, [searchParams])
 
   async function updateItemStatus(id: string, action: "used" | "wasted") {
+    if (actionInFlight.current) return
+    actionInFlight.current = true
     setActionError("")
     setUpdatingItemId(id)
 
@@ -184,6 +192,7 @@ function FoodListPageContent() {
         method: "POST",
       })
       const data = await response.json().catch(() => null)
+      if (!mounted.current) return
 
       if (!response.ok) {
         throw new Error(
@@ -194,8 +203,10 @@ function FoodListPageContent() {
         )
       }
 
+      onItemMarked(action === "used" ? "USED" : "WASTED")
       await loadItems()
     } catch (err) {
+      if (!mounted.current) return
       setActionError(
         err instanceof Error
           ? err.message
@@ -204,7 +215,8 @@ function FoodListPageContent() {
             : "Failed to mark item as wasted."
       )
     } finally {
-      setUpdatingItemId(null)
+      actionInFlight.current = false
+      if (mounted.current) setUpdatingItemId(null)
     }
   }
 
@@ -257,6 +269,7 @@ function FoodListPageContent() {
       })
 
       const data = (await response.json().catch(() => null)) as { error?: string; name?: string } | null
+      if (!mounted.current) return
 
       if (!response.ok) {
         // Keep the dialog open so the user can fix the issue
@@ -277,10 +290,11 @@ function FoodListPageContent() {
       })
       await loadItems()
     } catch {
+      if (!mounted.current) return
       // Network / unexpected error — keep dialog open
       setEditDialogError("Unable to reach the server. Please check your connection and try again.")
     } finally {
-      setEditSaving(false)
+      if (mounted.current) setEditSaving(false)
     }
   }
 
@@ -293,7 +307,6 @@ function FoodListPageContent() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Food List</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {items.length} active items in your kitchen
         </p>
@@ -351,7 +364,7 @@ function FoodListPageContent() {
                 type="button"
                 onClick={() => openEdit(item)}
                 aria-label="Edit"
-                disabled={updatingItemId === item.id}
+                disabled={updatingItemId !== null}
                 className="rounded-md border px-3 py-1 text-xs hover:bg-muted"
               >
                 Edit
@@ -359,7 +372,7 @@ function FoodListPageContent() {
               <button
                 onClick={() => markUsed(item.id)}
                 aria-label="Used"
-                disabled={updatingItemId === item.id}
+                disabled={updatingItemId !== null}
                 className="rounded-md border px-3 py-1 text-xs hover:bg-muted flex items-center gap-1"
               >
                 ✓ {updatingItemId === item.id ? "Updating..." : "Mark as Used"}
@@ -367,7 +380,7 @@ function FoodListPageContent() {
               <button
                 onClick={() => markWasted(item.id)}
                 aria-label="Wasted"
-                disabled={updatingItemId === item.id}
+                disabled={updatingItemId !== null}
                 className="rounded-md border border-red-200 px-3 py-1 text-xs text-red-700 hover:bg-red-50 flex items-center gap-1"
               >
                 ✕ {updatingItemId === item.id ? "Updating..." : "Mark as Wasted"}
@@ -500,5 +513,38 @@ export default function FoodListPage() {
     <Suspense fallback={null}>
       <FoodListPageContent />
     </Suspense>
+  )
+}
+
+function FoodListPageContent() {
+  const [view, setView] = useState("ACTIVE")
+  const [historyVersions, setHistoryVersions] = useState({ USED: 0, WASTED: 0 })
+
+  function refreshHistory(status: HistoryStatus) {
+    setHistoryVersions((versions) => ({ ...versions, [status]: versions[status] + 1 }))
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h1 className="text-2xl font-semibold tracking-tight">Food List</h1>
+      <Tabs value={view} onValueChange={setView}>
+        <TabsList aria-label="Food item views">
+          <TabsTrigger value="ACTIVE">Active</TabsTrigger>
+          <TabsTrigger value="USED">Used</TabsTrigger>
+          <TabsTrigger value="WASTED">Wasted</TabsTrigger>
+        </TabsList>
+        {/* Keep active edits and requests alive when browsing history. */}
+        <TabsContent value="ACTIVE" forceMount hidden={view !== "ACTIVE"}>
+          <ActiveFoodList onItemMarked={refreshHistory} />
+        </TabsContent>
+        {(["USED", "WASTED"] as const).map((status) => (
+          <TabsContent key={status} value={status}>
+            {view === status && (
+              <ItemHistoryList key={`${status}-${historyVersions[status]}`} status={status} />
+            )}
+          </TabsContent>
+        ))}
+      </Tabs>
+    </div>
   )
 }
