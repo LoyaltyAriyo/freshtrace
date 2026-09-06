@@ -16,6 +16,8 @@ export default defineConfig({
   schema: path.join(prismaRoot, "schema.prisma"),
   migrations: {
     path: path.join(prismaRoot, "migrations"),
-    seed: `tsx ${JSON.stringify(path.join(prismaRoot, "seed.ts"))}`,
+    // Prisma splits this command on spaces without shell-quote parsing. Both
+    // documented npm entrypoints run it from client/, so keep the path relative.
+    seed: "tsx prisma/seed.ts",
   },
 })
