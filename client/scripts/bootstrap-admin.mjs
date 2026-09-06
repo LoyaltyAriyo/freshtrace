@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js"
-import prismaPkg from "../generated/client/index.js"
+import prismaPkg from "../generated/prisma-client/index.js"
+
+import { loadClientEnvironment } from "./load-client-environment.mjs"
+
+loadClientEnvironment()
 
 const { PrismaClient, UserRole, AccountStatus } = prismaPkg
 
@@ -9,6 +13,7 @@ async function main() {
   console.log("Starting FreshTrace admin bootstrap...")
 
   const requiredEnvVars = [
+    "DATABASE_URL",
     "ADMIN_EMAIL",
     "ADMIN_PASSWORD",
     "ADMIN_FULL_NAME",
@@ -245,4 +250,3 @@ main()
     await prisma.$disconnect()
     process.exit(1)
   })
-

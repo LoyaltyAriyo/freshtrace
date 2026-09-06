@@ -124,8 +124,8 @@ User Interface -> API Routes -> Prisma ORM -> PostgreSQL / Supabase Storage
 
 Repository structure:
 
-- `client/` - Next.js frontend application using the App Router, shared components, application types, and Prisma schema/client setup for the main app
-- `server/` - backend utility scripts plus Prisma schema/client assets used for supporting scripts and administrative workflows
+- `client/` - the deployable Next.js application and Vercel root, including API routes, the sole active Prisma schema, PostgreSQL migrations, seed, generated client, and maintenance scripts
+- `server/` - retained legacy database artifacts only; its SQLite migration archive is historical and must never be applied to PostgreSQL
 
 ## Installation & Setup
 
@@ -148,15 +148,23 @@ npm install
 cp ../.env.example .env
 ```
 
-4. Generate the Prisma client, sync the database schema, and seed baseline data:
+4. Validate the schema and generate the Prisma Client:
 
 ```bash
+npm run prisma:validate
 npm run prisma:generate
-npm run prisma:push
+```
+
+5. After confirming that `DATABASE_URL` and `DIRECT_URL` target the intended
+   new or disposable PostgreSQL database, deploy the migration history and seed
+   baseline categories:
+
+```bash
+npm run prisma:migrate:deploy
 npm run prisma:seed
 ```
 
-5. Start the development server:
+6. Start the development server:
 
 From the repository root:
 
@@ -170,7 +178,7 @@ Or from `client/`:
 npm run dev
 ```
 
-6. Open the app in your browser:
+7. Open the app in your browser:
 
 ```text
 http://localhost:3000
@@ -185,6 +193,7 @@ DATABASE_URL="postgresql://user:password@localhost:5432/freshtrace"
 DIRECT_URL="postgresql://user:password@localhost:5432/freshtrace"
 NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="your-public-anon-key"
+SUPABASE_URL="https://your-project.supabase.co"
 SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
 ADMIN_EMAIL="admin@example.com"
 ADMIN_PASSWORD="change-me"
@@ -195,15 +204,30 @@ Real secrets must never be committed to the repository. Keep production or share
 
 ## Prisma / PostgreSQL Notes
 
-- Prisma commands in this project may rely on environment variables already being exported in your shell. In practice, having a local `.env` file is not always sufficient for every script path.
-- If Prisma commands fail because connection variables are missing, export the required values before running `npm run prisma:generate`, `npm run prisma:push`, or `npm run prisma:seed`.
-- If you previously worked with an older SQLite-based setup, stale generated artifacts can cause Prisma or runtime validation issues. Clearing `client/node_modules/.prisma` and `client/.next` before regenerating Prisma can resolve those mismatches.
+- Run Prisma and maintenance commands from `client/`. The repository-root commands are wrappers that delegate to the same `client/` scripts.
+- `client/prisma/schema.prisma` is the sole active schema, `client/prisma/migrations/` is the PostgreSQL migration history, `client/prisma/seed.ts` is the category seed, and `client/generated/prisma-client/` is the generated-client path.
+- Prisma and maintenance scripts load `client/.env.local` first and then `client/.env`; already exported shell variables take precedence.
+- `DATABASE_URL` is the application/runtime connection. `DIRECT_URL` is the direct connection used for migrations and other direct schema operations. Confirm both targets before any command that can access a database.
+- Use `npm run prisma:migrate:deploy` for PostgreSQL reconstruction. `prisma db push` is intentionally not part of the project scripts.
+- `server/prisma/migrations_legacy_sqlite/` is historical only. Never move, combine, replay, or apply those files to PostgreSQL.
+- Migrations and seeds are separate release operations and must not run as part of a Vercel build.
+
+Available commands, from `client/` or through the same-named repository-root wrapper:
+
+```bash
+npm run prisma:validate
+npm run prisma:generate
+npm run prisma:migrate:status
+npm run prisma:migrate:deploy
+npm run prisma:seed
+npm run bootstrap:admin
+```
 
 ## Admin Bootstrap Script
 
 FreshTrace includes an admin bootstrap utility for provisioning or reconciling an administrative account across Supabase Auth and the application database.
 
-Run it from the repository root:
+Run it from `client/`, or use the same command from the repository root:
 
 ```bash
 npm run bootstrap:admin
@@ -211,6 +235,8 @@ npm run bootstrap:admin
 
 Required environment variables:
 
+- `DATABASE_URL`
+- `DIRECT_URL` (used by the automatic pre-bootstrap Prisma generation step)
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
 - `ADMIN_FULL_NAME`

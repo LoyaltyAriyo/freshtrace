@@ -2,11 +2,16 @@
   "name": "fresh-trace-root",
   "private": true,
   "scripts": {
-    "dev": "cd client && npm run dev",
-    "dev:client": "cd client && npm run dev",
-    "dev:server": "echo \"No separate server dev process yet; server/ currently only contains Prisma schema, seed, and utility scripts.\"",
-    "bootstrap:admin": "node ./server/scripts/bootstrap-admin.mjs",
-    "cleanup:inventory": "node ./server/scripts/cleanup-inventory-test-data.mjs"
+    "dev": "npm --prefix ./client run dev",
+    "dev:client": "npm --prefix ./client run dev",
+    "dev:server": "echo \"No separate server process exists; the deployable application and backend tooling live in client/.\"",
+    "prisma:generate": "npm --prefix ./client run prisma:generate",
+    "prisma:validate": "npm --prefix ./client run prisma:validate",
+    "prisma:migrate:deploy": "npm --prefix ./client run prisma:migrate:deploy",
+    "prisma:migrate:status": "npm --prefix ./client run prisma:migrate:status",
+    "prisma:seed": "npm --prefix ./client run prisma:seed",
+    "bootstrap:admin": "npm --prefix ./client run bootstrap:admin",
+    "cleanup:inventory": "npm --prefix ./client run cleanup:inventory"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",

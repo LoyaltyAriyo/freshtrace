@@ -1,4 +1,8 @@
-import prismaPkg from "../generated/client/index.js"
+import prismaPkg from "../generated/prisma-client/index.js"
+
+import { loadClientEnvironment } from "./load-client-environment.mjs"
+
+loadClientEnvironment()
 
 const { PrismaClient } = prismaPkg
 
@@ -67,4 +71,3 @@ async function main() {
 }
 
 main()
-
