@@ -1,6 +1,9 @@
 {
   "name": "fresh-trace-root",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "npm --prefix ./client run dev",
     "dev:client": "npm --prefix ./client run dev",
@@ -12,16 +15,5 @@
     "prisma:seed": "npm --prefix ./client run prisma:seed",
     "bootstrap:admin": "npm --prefix ./client run bootstrap:admin",
     "cleanup:inventory": "npm --prefix ./client run cleanup:inventory"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.19.2",
-    "@supabase/supabase-js": "^2.99.3"
-  },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "jest": "^30.3.0",
-    "prisma": "^6.12.0",
-    "ts-jest": "^29.4.9"
   }
 }

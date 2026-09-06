@@ -129,17 +129,21 @@ Repository structure:
 
 ## Installation & Setup
 
+FreshTrace requires Node.js 22. The deployable application and its canonical
+npm lockfile both live in `client/`.
+
 1. Clone the repository:
 
 ```bash
 git clone https://github.com/T5-W26-COMP231/freshtrace.git
 ```
 
-2. Install frontend dependencies:
+2. Select Node.js 22 and install the reproducible application dependency set:
 
 ```bash
+nvm use
 cd client
-npm install
+npm ci
 ```
 
 3. Create a local environment file from the example template:
@@ -205,7 +209,9 @@ Real secrets must never be committed to the repository. Keep production or share
 ## Prisma / PostgreSQL Notes
 
 - Run Prisma and maintenance commands from `client/`. The repository-root commands are wrappers that delegate to the same `client/` scripts.
+- `client/package.json` and `client/package-lock.json` are the canonical application manifest and deployment lockfile. Run `npm ci` from `client/`; the root manifest has wrappers only and does not require a second dependency installation.
 - `client/prisma/schema.prisma` is the sole active schema, `client/prisma/migrations/` is the PostgreSQL migration history, `client/prisma/seed.ts` is the category seed, and `client/generated/prisma-client/` is the generated-client path.
+- Prisma CLI and Prisma Client are pinned to the same Prisma 6 release. `npm ci` runs the project-scoped generation command through `postinstall`, and the build runs it again through `prebuild`.
 - Prisma and maintenance scripts load `client/.env.local` first and then `client/.env`; already exported shell variables take precedence.
 - `DATABASE_URL` is the application/runtime connection. `DIRECT_URL` is the direct connection used for migrations and other direct schema operations. Confirm both targets before any command that can access a database.
 - Use `npm run prisma:migrate:deploy` for PostgreSQL reconstruction. `prisma db push` is intentionally not part of the project scripts.
@@ -222,6 +228,20 @@ npm run prisma:migrate:deploy
 npm run prisma:seed
 npm run bootstrap:admin
 ```
+
+## Vercel Deployment Settings
+
+Configure the Vercel project with these repository settings:
+
+- Root Directory: `client`
+- Node.js runtime: 22.x (declared by `client/package.json`)
+- Install Command: `npm ci`
+- Build Command: `npm run build`
+
+The committed `client/package-lock.json` is the deployment lockfile. Prisma
+Client generation runs during installation and before the Next.js build.
+Database migrations, category seeding, and admin bootstrap remain separate
+release operations and must not run as part of the Vercel build.
 
 ## Admin Bootstrap Script
 

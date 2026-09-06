@@ -426,6 +426,7 @@ FodyWeavers.xsd
 
 # dependencies
 package-lock.json
+!client/package-lock.json
 /node_modules
 /.pnp
 .pnp.*
