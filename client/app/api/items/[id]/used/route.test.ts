@@ -1,31 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("@/lib/prisma", () => {
-  const findUniqueMock = vi.fn()
-  const updateMock = vi.fn()
-  const upsertUsedItemMock = vi.fn()
-  const createNotificationMock = vi.fn()
-  const transactionMock = vi.fn()
+const prismaMocks = vi.hoisted(() => ({
+  findUniqueMock: vi.fn(),
+  updateMock: vi.fn(),
+  upsertUsedItemMock: vi.fn(),
+  createNotificationMock: vi.fn(),
+  transactionMock: vi.fn(),
+}))
 
+vi.mock("@/lib/prisma", () => {
   return {
     prisma: {
       foodItem: {
-        findUnique: findUniqueMock,
-        update: updateMock,
+        findUnique: prismaMocks.findUniqueMock,
+        update: prismaMocks.updateMock,
       },
       usedItem: {
-        upsert: upsertUsedItemMock,
+        upsert: prismaMocks.upsertUsedItemMock,
       },
       notification: {
-        create: createNotificationMock,
+        create: prismaMocks.createNotificationMock,
       },
-      $transaction: transactionMock,
+      $transaction: prismaMocks.transactionMock,
     },
-    findUniqueMock,
-    updateMock,
-    upsertUsedItemMock,
-    createNotificationMock,
-    transactionMock,
   }
 })
 
@@ -36,14 +33,13 @@ vi.mock("@/lib/auth", () => {
 })
 
 import { POST } from "./route"
-// @ts-expect-error - test-only mocked exports
-import {
+const {
   createNotificationMock,
   findUniqueMock,
   updateMock,
   upsertUsedItemMock,
   transactionMock,
-} from "@/lib/prisma"
+} = prismaMocks
 
 function makeParams(id: string) {
   return { params: Promise.resolve({ id }) }

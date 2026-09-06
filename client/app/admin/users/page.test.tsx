@@ -77,7 +77,11 @@ describe("AdminUsersPage filters and search", () => {
       await vi.runAllTimersAsync()
     })
 
-    fireEvent.change(screen.getByLabelText(/search users by name or email/i), {
+    const search = screen.getByRole("searchbox", {
+      name: /search users by name or email/i,
+    })
+
+    fireEvent.change(search, {
       target: { value: "test" },
     })
 
@@ -85,10 +89,12 @@ describe("AdminUsersPage filters and search", () => {
       await vi.advanceTimersByTimeAsync(300)
     })
 
-    const clear = screen.getByTestId("admin-users-clear-filters")
+    const clear = screen.getByRole("button", { name: /clear filters/i })
     fetchMock.mockClear()
 
     fireEvent.click(clear)
+
+    expect(search).toHaveValue("")
 
     await act(async () => {
       await vi.runAllTimersAsync()

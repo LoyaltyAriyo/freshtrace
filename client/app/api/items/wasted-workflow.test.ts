@@ -1,29 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("@/lib/prisma", () => {
-  const findUniqueMock = vi.fn()
-  const updateMock = vi.fn()
-  const upsertMock = vi.fn()
-  const transactionMock = vi.fn()
-  const findManyMock = vi.fn()
+const prismaMocks = vi.hoisted(() => ({
+  findUniqueMock: vi.fn(),
+  updateMock: vi.fn(),
+  upsertMock: vi.fn(),
+  createNotificationMock: vi.fn(),
+  transactionMock: vi.fn(),
+  findManyMock: vi.fn(),
+}))
 
+vi.mock("@/lib/prisma", () => {
   return {
     prisma: {
       foodItem: {
-        findUnique: findUniqueMock,
-        update: updateMock,
-        findMany: findManyMock,
+        findUnique: prismaMocks.findUniqueMock,
+        update: prismaMocks.updateMock,
+        findMany: prismaMocks.findManyMock,
       },
       wastedItem: {
-        upsert: upsertMock,
+        upsert: prismaMocks.upsertMock,
       },
-      $transaction: transactionMock,
+      notification: {
+        create: prismaMocks.createNotificationMock,
+      },
+      $transaction: prismaMocks.transactionMock,
     },
-    findUniqueMock,
-    updateMock,
-    upsertMock,
-    transactionMock,
-    findManyMock,
   }
 })
 
@@ -35,14 +36,14 @@ vi.mock("@/lib/auth", () => {
 
 import { POST as markItemWasted } from "./[id]/wasted/route"
 import { GET as getActiveItems } from "./route"
-// @ts-expect-error - test-only mocked exports
-import {
+const {
+  createNotificationMock,
   findUniqueMock,
   updateMock,
   upsertMock,
   transactionMock,
   findManyMock,
-} from "@/lib/prisma"
+} = prismaMocks
 
 function makeParams(id: string | undefined) {
   return { params: Promise.resolve({ id } as { id: string }) }
@@ -53,8 +54,10 @@ describe("Wasted items workflow", () => {
     findUniqueMock.mockReset()
     updateMock.mockReset()
     upsertMock.mockReset()
+    createNotificationMock.mockReset()
     transactionMock.mockReset()
     findManyMock.mockReset()
+    createNotificationMock.mockResolvedValue({ id: "notification-1" })
   })
 
   it("marks ACTIVE item as WASTED and persists wasted history", async () => {
@@ -97,6 +100,7 @@ describe("Wasted items workflow", () => {
       }),
     )
     expect(upsertMock).toHaveBeenCalledTimes(1)
+    expect(createNotificationMock).toHaveBeenCalledTimes(1)
   })
 
   it("returns 404 when item to waste is not found", async () => {
@@ -187,9 +191,10 @@ describe("Wasted items workflow", () => {
     expect(transactionMock).toHaveBeenCalledTimes(1)
     const callArgs = transactionMock.mock.calls[0]?.[0]
     expect(Array.isArray(callArgs)).toBe(true)
-    expect(callArgs).toHaveLength(2)
+    expect(callArgs).toHaveLength(3)
     expect(updateMock).toHaveBeenCalledTimes(1)
     expect(upsertMock).toHaveBeenCalledTimes(1)
+    expect(createNotificationMock).toHaveBeenCalledTimes(1)
   })
 
   it("ensures WASTED items are not returned in ACTIVE food list", async () => {

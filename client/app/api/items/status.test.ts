@@ -1,39 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("@/lib/prisma", () => {
-  const findUniqueMock = vi.fn()
-  const updateMock = vi.fn()
-  const findManyMock = vi.fn()
-  const upsertUsedItemMock = vi.fn()
-  const upsertWastedItemMock = vi.fn()
-  const createNotificationMock = vi.fn()
-  const transactionMock = vi.fn()
+const prismaMocks = vi.hoisted(() => ({
+  findUniqueMock: vi.fn(),
+  updateMock: vi.fn(),
+  findManyMock: vi.fn(),
+  upsertUsedItemMock: vi.fn(),
+  upsertWastedItemMock: vi.fn(),
+  createNotificationMock: vi.fn(),
+  transactionMock: vi.fn(),
+}))
 
+vi.mock("@/lib/prisma", () => {
   return {
     prisma: {
       foodItem: {
-        findUnique: findUniqueMock,
-        update: updateMock,
-        findMany: findManyMock,
+        findUnique: prismaMocks.findUniqueMock,
+        update: prismaMocks.updateMock,
+        findMany: prismaMocks.findManyMock,
       },
       usedItem: {
-        upsert: upsertUsedItemMock,
+        upsert: prismaMocks.upsertUsedItemMock,
       },
       wastedItem: {
-        upsert: upsertWastedItemMock,
+        upsert: prismaMocks.upsertWastedItemMock,
       },
       notification: {
-        create: createNotificationMock,
+        create: prismaMocks.createNotificationMock,
       },
-      $transaction: transactionMock,
+      $transaction: prismaMocks.transactionMock,
     },
-    findUniqueMock,
-    updateMock,
-    findManyMock,
-    upsertUsedItemMock,
-    upsertWastedItemMock,
-    createNotificationMock,
-    transactionMock,
   }
 })
 
@@ -46,8 +41,7 @@ vi.mock("@/lib/auth", () => {
 import { GET as getActiveItems } from "./route"
 import { POST as markItemUsed } from "./[id]/used/route"
 import { POST as markItemWasted } from "./[id]/wasted/route"
-// @ts-expect-error - test-only mocked exports
-import {
+const {
   createNotificationMock,
   findUniqueMock,
   updateMock,
@@ -55,7 +49,7 @@ import {
   upsertUsedItemMock,
   upsertWastedItemMock,
   transactionMock,
-} from "@/lib/prisma"
+} = prismaMocks
 
 function makeParams(id: string | undefined) {
   return { params: Promise.resolve({ id } as { id: string }) }

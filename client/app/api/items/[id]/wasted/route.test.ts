@@ -1,31 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("@/lib/prisma", () => {
-  const findUniqueMock = vi.fn()
-  const updateMock = vi.fn()
-  const upsertMock = vi.fn()
-  const createNotificationMock = vi.fn()
-  const transactionMock = vi.fn()
+const prismaMocks = vi.hoisted(() => ({
+  findUniqueMock: vi.fn(),
+  updateMock: vi.fn(),
+  upsertMock: vi.fn(),
+  createNotificationMock: vi.fn(),
+  transactionMock: vi.fn(),
+}))
 
+vi.mock("@/lib/prisma", () => {
   return {
     prisma: {
       foodItem: {
-        findUnique: findUniqueMock,
-        update: updateMock,
+        findUnique: prismaMocks.findUniqueMock,
+        update: prismaMocks.updateMock,
       },
       wastedItem: {
-        upsert: upsertMock,
+        upsert: prismaMocks.upsertMock,
       },
       notification: {
-        create: createNotificationMock,
+        create: prismaMocks.createNotificationMock,
       },
-      $transaction: transactionMock,
+      $transaction: prismaMocks.transactionMock,
     },
-    findUniqueMock,
-    updateMock,
-    upsertMock,
-    createNotificationMock,
-    transactionMock,
   }
 })
 
@@ -36,14 +33,13 @@ vi.mock("@/lib/auth", () => {
 })
 
 import { POST } from "./route"
-// @ts-expect-error - test-only mocked exports
-import {
+const {
   createNotificationMock,
   findUniqueMock,
   updateMock,
   upsertMock,
   transactionMock,
-} from "@/lib/prisma"
+} = prismaMocks
 
 function makeParams(id: string) {
   return { params: Promise.resolve({ id }) }
@@ -80,7 +76,9 @@ describe("POST /api/items/[id]/wasted", () => {
       status: "ACTIVE",
       userId: "user-123",
     })
-    transactionMock.mockResolvedValue([{ id: "item-1", status: "WASTED" }, { id: "wasted-1" }])
+    updateMock.mockResolvedValue({ id: "item-1", status: "WASTED" })
+    upsertMock.mockResolvedValue({ id: "wasted-1" })
+    transactionMock.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops))
 
     const response = await POST(new Request("http://localhost/api/items/item-1/wasted", { method: "POST" }), makeParams("item-1"))
 
@@ -92,6 +90,7 @@ describe("POST /api/items/[id]/wasted", () => {
       changed: true,
     })
     expect(transactionMock).toHaveBeenCalledTimes(1)
+    expect(transactionMock.mock.calls[0]?.[0]).toHaveLength(3)
     // Ensure the route actually attempts to persist the wasted-item history entry.
     expect(updateMock).toHaveBeenCalledTimes(1)
     expect(upsertMock).toHaveBeenCalledTimes(1)

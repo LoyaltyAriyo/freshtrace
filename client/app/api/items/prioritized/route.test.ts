@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("@/lib/prisma", () => {
-  const findManyMock = vi.fn()
+const prismaMocks = vi.hoisted(() => ({
+  findManyMock: vi.fn(),
+}))
 
+vi.mock("@/lib/prisma", () => {
   return {
     prisma: {
       foodItem: {
-        findMany: findManyMock,
+        findMany: prismaMocks.findManyMock,
       },
     },
-    findManyMock,
   }
 })
 
@@ -20,8 +21,7 @@ vi.mock("@/lib/auth", () => {
 })
 
 import { GET } from "./route"
-// @ts-expect-error - test-only mocked exports
-import { findManyMock } from "@/lib/prisma"
+const { findManyMock } = prismaMocks
 
 describe("GET /api/items/prioritized", () => {
   beforeEach(() => {
@@ -39,14 +39,14 @@ describe("GET /api/items/prioritized", () => {
         name: "Milk",
         quantity: 2,
         dateAdded: new Date("2026-03-10T00:00:00.000Z"),
-        category: { name: "Dairy" },
+        category: { name: "Dairy", shelfLifeDays: 7 },
       },
       {
         id: "item-2",
         name: "Apple",
         quantity: 3,
         dateAdded: new Date("2026-03-21T00:00:00.000Z"),
-        category: { name: "Produce" },
+        category: { name: "Produce", shelfLifeDays: 7 },
       },
     ])
 
@@ -81,23 +81,23 @@ describe("GET /api/items/prioritized", () => {
         quantity: 1,
         // 1 day old -> use-later
         dateAdded: new Date("2026-03-20T12:00:00.000Z"),
-        category: { name: "Dairy" },
+        category: { name: "Dairy", shelfLifeDays: 7 },
       },
       {
         id: "soon-item",
         name: "Apples",
         quantity: 3,
-        // 4 days old -> use-soon
-        dateAdded: new Date("2026-03-17T12:00:00.000Z"),
-        category: { name: "Produce" },
+        // 3 days old -> use-soon
+        dateAdded: new Date("2026-03-18T12:00:00.000Z"),
+        category: { name: "Produce", shelfLifeDays: 7 },
       },
       {
         id: "first-item",
         name: "Leftover Pasta",
         quantity: 2,
-        // 11 days old -> use-first
-        dateAdded: new Date("2026-03-10T12:00:00.000Z"),
-        category: { name: "Leftover" },
+        // 5 days old -> use-first
+        dateAdded: new Date("2026-03-16T12:00:00.000Z"),
+        category: { name: "Leftover", shelfLifeDays: 7 },
       },
     ])
 
