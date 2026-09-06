@@ -1,0 +1,45 @@
+# Version control and local tool state
+.git/
+.codex/
+.serena/
+
+# Dependencies and framework/build outputs
+node_modules/
+.next/
+coverage/
+build/
+dist/
+out/
+bld/
+
+# Generated Prisma clients (keep schemas and migrations indexed)
+client/generated/prisma-client/
+server/generated/client/
+
+# Graphify generated output
+graphify-out/
+graph.json
+
+# Local databases
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+
+# Local environment files containing secrets (keep examples indexed)
+.env
+.env.*
+!.env.example
+!.env*.example
+
+# Large screenshots and binary assets irrelevant to backend analysis
+asset/screenshots/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.ico
+*.pdf
+*.docx
