@@ -481,7 +481,7 @@ coverage
 # Graphify generated artifacts (keep the local knowledge graph uncommitted)
 graphify-out/
 graph.json
-.codex/hooks.json
+/.codex/
 
 # Local Serena project state
 .serena/
