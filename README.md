@@ -200,12 +200,31 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY="your-public-anon-key"
 SUPABASE_URL="https://your-project.supabase.co"
 SUPABASE_ANON_KEY="your-public-anon-key"
 SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+TESSERACT_ENABLED="false"
 ADMIN_EMAIL="admin@example.com"
 ADMIN_PASSWORD="change-me"
 ADMIN_FULL_NAME="Admin User"
 ```
 
 Real secrets must never be committed to the repository. Keep production or shared credentials outside version control and use environment-specific secret management where appropriate.
+
+### Receipt OCR
+
+Receipt OCR is disabled unless the server-side `TESSERACT_ENABLED` variable is
+set to exactly `true`. Although this switch is not a secret, keep it in server
+configuration; do not add a `NEXT_PUBLIC_` version or expose it to browser code.
+
+For local receipt scanning, add this to `client/.env` or `client/.env.local`:
+
+```env
+TESSERACT_ENABLED="true"
+```
+
+For production receipt scanning on Vercel, add `TESSERACT_ENABLED=true` in the
+project's Environment Variables for the desired environments, then redeploy.
+With Root Directory set to `client`, the production build traces the tracked
+English language data and the Tesseract Node worker into only the receipt API
+function. OCR never downloads language data during a request.
 
 ### Signup and email confirmation
 

@@ -90,7 +90,7 @@ describe("ReviewPage", () => {
     ).toBeInTheDocument()
   })
 
-  it("shows an empty state when the receipt has no draft items", async () => {
+  it("shows a distinct disabled OCR state and allows returning to scan", async () => {
     getSearchParamMock.mockReturnValue("receipt-123")
 
     const fetchMock = vi.fn().mockResolvedValue({
@@ -108,14 +108,59 @@ describe("ReviewPage", () => {
 
     render(<ReviewPage />)
 
-    expect(
-      await screen.findByTestId("ocr-pending"),
-    ).toHaveTextContent(
-      /couldn'?t extract any items from this receipt yet/i,
+    expect(await screen.findByTestId("ocr-disabled")).toHaveTextContent(
+      /scanning is disabled for this deployment/i,
     )
+
+    fireEvent.click(screen.getByRole("button", { name: /return to scan/i }))
+    expect(pushMock).toHaveBeenCalledWith("/scan")
 
     const confirmButton = screen.getByRole("button", { name: /confirm items/i })
     expect(confirmButton).toBeDisabled()
+  })
+
+  it("shows a distinct runtime failure state", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        id: "receipt-123",
+        ocrStatus: "FAILED",
+        imagePath: "uploads/receipt.jpg",
+        draftItems: [],
+      }),
+    } as unknown as Response))
+
+    render(<ReviewPage />)
+
+    expect(await screen.findByTestId("ocr-failed")).toHaveTextContent(
+      /couldn't process this receipt because scanning failed/i,
+    )
+    expect(screen.getByRole("button", { name: /return to scan/i })).toBeEnabled()
+  })
+
+  it("keeps clear-photo guidance for a successful scan with no items", async () => {
+    getSearchParamMock.mockReturnValue("receipt-123")
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        id: "receipt-123",
+        ocrStatus: "SUCCESS",
+        imagePath: "uploads/receipt.jpg",
+        draftItems: [],
+      }),
+    } as unknown as Response))
+
+    render(<ReviewPage />)
+
+    expect(await screen.findByTestId("ocr-no-items")).toHaveTextContent(
+      /try uploading a clearer photo/i,
+    )
+    expect(screen.getByText(/manual entry page/i)).toBeInTheDocument()
   })
 
   it("normalizes malformed draft items safely", async () => {

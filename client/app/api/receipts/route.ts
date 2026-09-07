@@ -1,7 +1,11 @@
 export const runtime = "nodejs"
 import { prisma } from "@/lib/prisma"
 import { ensureCategories, findCategoryIdForItemName } from "@/lib/category-utils"
-import { extractReceiptDraftItems } from "@/lib/ocr"
+import {
+  extractReceiptDraftItems,
+  type OcrExtractionResult,
+  type OcrOutcomeStatus,
+} from "@/lib/ocr"
 import { supabaseAdmin } from "@/lib/supabase/server"
 import { getCurrentUserId } from "@/lib/auth"
 import { logError } from "@/lib/logger"
@@ -9,6 +13,22 @@ import { logError } from "@/lib/logger"
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 const RECEIPTS_BUCKET = "receipts"
+
+type PersistedOcrStatus = "PENDING" | "SUCCESS" | "FAILED" | "FALLBACK_USED"
+
+function getPersistedOcrStatus(outcome: OcrOutcomeStatus): PersistedOcrStatus {
+  switch (outcome) {
+    case "DISABLED":
+      return "PENDING"
+    case "NO_ITEMS":
+    case "SUCCESS":
+      return "SUCCESS"
+    case "FALLBACK_USED":
+      return "FALLBACK_USED"
+    case "FAILED":
+      return "FAILED"
+  }
+}
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set<string>([
   "image/jpeg",
@@ -127,19 +147,47 @@ export async function POST(request: Request) {
         },
       })
 
-      let finalStatus: "SUCCESS" | "FAILED" | "FALLBACK_USED" = "FAILED"
+      let finalStatus: PersistedOcrStatus = "FAILED"
+      let ocrOutcome: OcrOutcomeStatus = "FAILED"
+      const storedImageBytes = await downloadReceiptObjectBytes(objectPath)
 
-      try {
-        const storedImageBytes = await downloadReceiptObjectBytes(objectPath)
+      if (storedImageBytes) {
+        let extraction: OcrExtractionResult
 
-        if (!storedImageBytes) {
-          throw new Error("Unable to download receipt image from storage.")
+        try {
+          extraction = await extractReceiptDraftItems(storedImageBytes)
+        } catch {
+          extraction = {
+            status: "FAILED",
+            items: [],
+            fallbackUsed: false,
+            failure: {
+              stage: "INITIALIZATION",
+              category: "OCR_UNEXPECTED_FAILURE",
+            },
+          }
         }
 
-        const extraction = await extractReceiptDraftItems(storedImageBytes)
-        const categories = await ensureCategories(prisma.category)
+        ocrOutcome = extraction.status
+        finalStatus = getPersistedOcrStatus(extraction.status)
 
-        if (extraction.items.length > 0) {
+        if (extraction.status === "FAILED") {
+          const failure = extraction.failure
+          await logError({
+            message: "Receipt OCR processing failed.",
+            errorType: "OCR_FAILURE",
+            source: "OCR",
+            severity: "WARNING",
+            details: {
+              receiptId: receipt.id,
+              objectPath,
+              stage: failure?.stage ?? "INITIALIZATION",
+              errorCategory: failure?.category ?? "OCR_UNKNOWN_FAILURE",
+              terminationFailed: failure?.terminationFailed ?? false,
+            },
+          })
+        } else if (extraction.items.length > 0) {
+          const categories = await ensureCategories(prisma.category)
           await prisma.receiptItemDraft.createMany({
             data: extraction.items.map((item) => ({
               receiptId: receipt.id,
@@ -150,21 +198,11 @@ export async function POST(request: Request) {
               isSelected: true,
             })),
           })
-
-          finalStatus = extraction.fallbackUsed ? "FALLBACK_USED" : "SUCCESS"
-        } else {
-          finalStatus = "FAILED"
         }
-      } catch (ocrError) {
-        await logError({
-          message: "OCR extraction failed.",
-          error: ocrError,
-          errorType: "OCR_FAILURE",
-          source: "OCR",
-          severity: "WARNING",
-          details: { receiptId: receipt.id, objectPath },
-        })
-        finalStatus = "FAILED"
+      }
+
+      if (!storedImageBytes) {
+        ocrOutcome = "FAILED"
       }
 
       await prisma.receipt.update({
@@ -175,7 +213,7 @@ export async function POST(request: Request) {
       })
 
       return Response.json(
-        { receiptId: receipt.id, ocrStatus: finalStatus },
+        { receiptId: receipt.id, ocrStatus: finalStatus, ocrOutcome },
         { status: 201 }
       )
     } catch (dbError) {

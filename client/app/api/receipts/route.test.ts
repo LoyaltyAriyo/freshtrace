@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
+const loggerMocks = vi.hoisted(() => ({
+  logError: vi.fn(),
+}))
+
+vi.mock("@/lib/logger", () => ({
+  logError: loggerMocks.logError,
+}))
+
 vi.mock("@/lib/supabase/server", () => {
   const uploadMock = vi.fn()
   const removeMock = vi.fn()
@@ -94,6 +102,7 @@ describe("POST /api/receipts route", () => {
     findCategoriesMock.mockReset()
     createCategoriesMock.mockReset()
     extractReceiptDraftItemsMock.mockReset()
+    loggerMocks.logError.mockReset().mockResolvedValue(undefined)
     findCategoriesMock.mockResolvedValue([
       { id: "cat-dairy", name: "Dairy", shelfLifeDays: 10 },
       { id: "cat-bakery", name: "Bakery", shelfLifeDays: 5 },
@@ -157,6 +166,7 @@ describe("POST /api/receipts route", () => {
       id: "receipt-123",
     })
     extractReceiptDraftItemsMock.mockResolvedValue({
+      status: "SUCCESS",
       items: [
         { name: "Milk", quantity: 2, confidence: 0.88 },
       ],
@@ -179,6 +189,7 @@ describe("POST /api/receipts route", () => {
     const body = await response.json()
     expect(body.receiptId).toBe("receipt-123")
     expect(body.ocrStatus).toBe("SUCCESS")
+    expect(body.ocrOutcome).toBe("SUCCESS")
     expect(uploadMock).toHaveBeenCalledTimes(1)
     expect(downloadMock).toHaveBeenCalledTimes(1)
     expect(createReceiptMock).toHaveBeenCalledTimes(1)
@@ -205,6 +216,7 @@ describe("POST /api/receipts route", () => {
     })
     createReceiptMock.mockResolvedValue({ id: "receipt-123" })
     extractReceiptDraftItemsMock.mockResolvedValue({
+      status: "FALLBACK_USED",
       items: [{ name: "Bread", quantity: 1, confidence: null }],
       fallbackUsed: true,
     })
@@ -224,6 +236,7 @@ describe("POST /api/receipts route", () => {
     expect(response.status).toBe(201)
     const body = await response.json()
     expect(body.ocrStatus).toBe("FALLBACK_USED")
+    expect(body.ocrOutcome).toBe("FALLBACK_USED")
   })
 
   it("creates default categories before matching when none exist yet", async () => {
@@ -238,6 +251,7 @@ describe("POST /api/receipts route", () => {
     ])
     createCategoriesMock.mockResolvedValue({ count: 10 })
     extractReceiptDraftItemsMock.mockResolvedValue({
+      status: "SUCCESS",
       items: [{ name: "Milk", quantity: 1, confidence: 0.9 }],
       fallbackUsed: false,
     })
@@ -262,7 +276,7 @@ describe("POST /api/receipts route", () => {
     })
   })
 
-  it("sets FAILED when OCR returns no items", async () => {
+  it("keeps historical SUCCESS status for a structured NO_ITEMS outcome", async () => {
     uploadMock.mockResolvedValue({ error: null })
     downloadMock.mockResolvedValue({
       data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }),
@@ -270,10 +284,11 @@ describe("POST /api/receipts route", () => {
     })
     createReceiptMock.mockResolvedValue({ id: "receipt-123" })
     extractReceiptDraftItemsMock.mockResolvedValue({
+      status: "NO_ITEMS",
       items: [],
       fallbackUsed: false,
     })
-    updateReceiptMock.mockResolvedValue({ id: "receipt-123", ocrStatus: "FAILED" })
+    updateReceiptMock.mockResolvedValue({ id: "receipt-123", ocrStatus: "SUCCESS" })
 
     const formData = new FormData()
     formData.append(
@@ -287,8 +302,90 @@ describe("POST /api/receipts route", () => {
 
     expect(response.status).toBe(201)
     const body = await response.json()
-    expect(body.ocrStatus).toBe("FAILED")
+    expect(body.ocrStatus).toBe("SUCCESS")
+    expect(body.ocrOutcome).toBe("NO_ITEMS")
     expect(createDraftItemsMock).not.toHaveBeenCalled()
+    expect(loggerMocks.logError).not.toHaveBeenCalled()
+  })
+
+  it("keeps historical PENDING status for a structured DISABLED outcome", async () => {
+    uploadMock.mockResolvedValue({ error: null })
+    downloadMock.mockResolvedValue({
+      data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }),
+      error: null,
+    })
+    createReceiptMock.mockResolvedValue({ id: "receipt-123" })
+    extractReceiptDraftItemsMock.mockResolvedValue({
+      status: "DISABLED",
+      items: [],
+      fallbackUsed: false,
+    })
+    updateReceiptMock.mockResolvedValue({ id: "receipt-123", ocrStatus: "PENDING" })
+
+    const formData = new FormData()
+    formData.append(
+      "receipt",
+      new File(["data"], "receipt.jpg", { type: "image/jpeg" })
+    )
+
+    const response = await POST(makeTestRequest(formData))
+    const body = await response.json()
+
+    expect(body).toMatchObject({
+      receiptId: "receipt-123",
+      ocrStatus: "PENDING",
+      ocrOutcome: "DISABLED",
+    })
+    expect(createDraftItemsMock).not.toHaveBeenCalled()
+    expect(loggerMocks.logError).not.toHaveBeenCalled()
+  })
+
+  it("logs one sanitized operational entry for a structured FAILED outcome", async () => {
+    const extractedReceiptText = "Private Customer 4111 1111 1111 1111"
+    uploadMock.mockResolvedValue({ error: null })
+    downloadMock.mockResolvedValue({
+      data: new Blob([new Uint8Array([7, 8, 9])], { type: "image/jpeg" }),
+      error: null,
+    })
+    createReceiptMock.mockResolvedValue({ id: "receipt-123" })
+    extractReceiptDraftItemsMock.mockResolvedValue({
+      status: "FAILED",
+      items: [],
+      fallbackUsed: false,
+      failure: {
+        stage: "RECOGNITION",
+        category: "OCR_RECOGNITION_FAILED",
+      },
+      rawText: extractedReceiptText,
+    })
+    updateReceiptMock.mockResolvedValue({ id: "receipt-123", ocrStatus: "FAILED" })
+
+    const formData = new FormData()
+    formData.append(
+      "receipt",
+      new File(["private-image-bytes"], "receipt.jpg", { type: "image/jpeg" })
+    )
+
+    const response = await POST(makeTestRequest(formData))
+    const body = await response.json()
+
+    expect(body).toMatchObject({ ocrStatus: "FAILED", ocrOutcome: "FAILED" })
+    expect(loggerMocks.logError).toHaveBeenCalledTimes(1)
+    expect(loggerMocks.logError).toHaveBeenCalledWith({
+      message: "Receipt OCR processing failed.",
+      errorType: "OCR_FAILURE",
+      source: "OCR",
+      severity: "WARNING",
+      details: expect.objectContaining({
+        receiptId: "receipt-123",
+        objectPath: expect.stringMatching(/^uploads\//),
+        stage: "RECOGNITION",
+        errorCategory: "OCR_RECOGNITION_FAILED",
+      }),
+    })
+    const serializedLog = JSON.stringify(loggerMocks.logError.mock.calls)
+    expect(serializedLog).not.toContain(extractedReceiptText)
+    expect(serializedLog).not.toContain("private-image-bytes")
   })
 
   it("sets FAILED when uploaded object cannot be downloaded for OCR", async () => {
@@ -310,7 +407,9 @@ describe("POST /api/receipts route", () => {
     expect(response.status).toBe(201)
     const body = await response.json()
     expect(body.ocrStatus).toBe("FAILED")
+    expect(body.ocrOutcome).toBe("FAILED")
     expect(extractReceiptDraftItemsMock).not.toHaveBeenCalled()
+    expect(loggerMocks.logError).toHaveBeenCalledTimes(1)
   })
 
   it("handles storage upload failure", async () => {

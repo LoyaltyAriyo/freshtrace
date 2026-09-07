@@ -1,68 +1,15 @@
+import "server-only"
+
 import { Buffer } from "node:buffer"
 import fs from "node:fs"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
+
 import { NOISE_PATTERNS, parseFallbackReceiptItems } from "@/lib/fallback-parser"
 
-// Tesseract can be fragile in some local dev/runtime environments (for example,
-// when worker scripts cannot be resolved correctly). To keep the app stable,
-// OCR via tesseract.js is disabled by default and must be explicitly enabled
-// with an environment variable:
-//
-//   NEXT_PUBLIC_TESSERACT_ENABLED=true  (or TESSERACT_ENABLED=true)
-//
-// When disabled, this module will safely return an empty result so the rest of
-// the receipt flow can show a clear “OCR failed / no items found” state instead
-// of crashing the server.
-const TESSERACT_ENABLED =
-	process.env.NEXT_PUBLIC_TESSERACT_ENABLED === "true" ||
-	process.env.TESSERACT_ENABLED === "true"
-
 const DEFAULT_LANG_FILE = "eng.traineddata"
-
-function resolveLangPath() {
-	const cwd = process.cwd()
-
-	const candidates = [
-		cwd,
-		path.join(cwd, ".."),
-	]
-
-	for (const dir of candidates) {
-		try {
-			const candidateFile = path.join(dir, DEFAULT_LANG_FILE)
-			if (fs.existsSync(candidateFile)) {
-				return dir
-			}
-		} catch {
-			// ignore and try next candidate
-		}
-	}
-
-	return cwd
-}
-
-const TESSERACT_LANG_PATH = resolveLangPath()
-const TESSERACT_CACHE_PATH = process.env.VERCEL ? "/tmp" : process.cwd()
-let RESOLVED_WORKER_PATH: string | undefined
-{
-	// Resolve a real filesystem path for the tesseract worker script.
-	const cwd = process.cwd()
-	const candidates = [
-		path.join(cwd, "node_modules/tesseract.js/src/worker-script/node/index.js"),
-		path.join(cwd, "client/node_modules/tesseract.js/src/worker-script/node/index.js"),
-	]
-
-	for (const candidate of candidates) {
-		try {
-			if (fs.existsSync(candidate)) {
-				RESOLVED_WORKER_PATH = candidate
-				break
-			}
-		} catch {
-			// ignore and try next
-		}
-	}
-}
+const WORKER_RELATIVE_PATH = "node_modules/tesseract.js/src/worker-script/node/index.js"
+const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url))
 
 export type OcrDraftItem = {
 	name: string
@@ -70,9 +17,128 @@ export type OcrDraftItem = {
 	confidence: number | null
 }
 
+export type OcrOutcomeStatus =
+	| "DISABLED"
+	| "SUCCESS"
+	| "NO_ITEMS"
+	| "FAILED"
+	| "FALLBACK_USED"
+
+export type OcrFailureStage =
+	| "INITIALIZATION"
+	| "RECOGNITION"
+	| "PARSING"
+	| "TERMINATION"
+
+type OcrFailure = {
+	stage: OcrFailureStage
+	category: string
+	terminationFailed?: boolean
+}
+
 export type OcrExtractionResult = {
+	status: OcrOutcomeStatus
 	items: OcrDraftItem[]
 	fallbackUsed: boolean
+	failure?: OcrFailure
+}
+
+type RuntimeAssetOptions = {
+	cwd?: string
+	moduleDirectory?: string
+	fileExists?: (candidate: string) => boolean
+}
+
+export type OcrRuntimeAssets = {
+	langPath: string
+	workerPath: string
+}
+
+type OcrWorker = {
+	recognize: (image: Buffer) => Promise<{
+		data?: { text?: string; confidence?: number }
+	}>
+	terminate: () => Promise<unknown>
+}
+
+type TesseractModule = {
+	createWorker: (
+		langs: string,
+		oem: number,
+		options: Record<string, unknown>,
+	) => Promise<OcrWorker>
+}
+
+function isFile(candidate: string): boolean {
+	try {
+		return fs.statSync(candidate).isFile()
+	} catch {
+		return false
+	}
+}
+
+function getAncestorDirectories(start: string): string[] {
+	const directories: string[] = []
+	let current = path.resolve(start)
+
+	for (let depth = 0; depth < 10; depth += 1) {
+		directories.push(current)
+		const parent = path.dirname(current)
+		if (parent === current) break
+		current = parent
+	}
+
+	return directories
+}
+
+function firstExistingFile(
+	candidates: string[],
+	fileExists: (candidate: string) => boolean,
+): string | null {
+	for (const candidate of candidates) {
+		if (fileExists(candidate)) return candidate
+	}
+	return null
+}
+
+/** Resolve files from source and traced serverless layouts without relying only on cwd. */
+export function resolveOcrRuntimeAssets({
+	cwd = process.cwd(),
+	moduleDirectory = MODULE_DIRECTORY,
+	fileExists = isFile,
+}: RuntimeAssetOptions = {}): OcrRuntimeAssets | null {
+	const roots = Array.from(
+		new Set([
+			...getAncestorDirectories(moduleDirectory),
+			...getAncestorDirectories(cwd),
+		]),
+	)
+
+	const langFile = firstExistingFile(
+		roots.flatMap((root) => [
+			path.join(root, DEFAULT_LANG_FILE),
+			path.join(root, "client", DEFAULT_LANG_FILE),
+		]),
+		fileExists,
+	)
+	const workerFile = firstExistingFile(
+		roots.flatMap((root) => [
+			path.join(root, WORKER_RELATIVE_PATH),
+			path.join(root, "client", WORKER_RELATIVE_PATH),
+		]),
+		fileExists,
+	)
+
+	if (!langFile || !workerFile) return null
+
+	return {
+		langPath: path.dirname(langFile),
+		workerPath: workerFile,
+	}
+}
+
+export function isOcrEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+	return env.TESSERACT_ENABLED === "true"
 }
 
 function parseLineToItem(line: string, confidence: number | null): OcrDraftItem | null {
@@ -82,12 +148,11 @@ function parseLineToItem(line: string, confidence: number | null): OcrDraftItem 
 		.trim()
 
 	if (!cleanLine || !/[a-z]/i.test(cleanLine)) return null
-	// Filter gibberish: lines where most tokens are 1-3 repeated letters (e.g. "ERE RRR RR")
 	const tokens = cleanLine.split(/\s+/)
-	const gibberishTokens = tokens.filter((t) => /^([a-z])\1*$/i.test(t) || /^[a-z]{1,3}$/i.test(t))
+	const gibberishTokens = tokens.filter((token) =>
+		/^([a-z])\1*$/i.test(token) || /^[a-z]{1,3}$/i.test(token),
+	)
 	if (tokens.length > 2 && gibberishTokens.length / tokens.length > 0.6) return null
-	// Treat lines that are clearly metadata (weights, dates, headers, etc.) as noise.
-	// Also catch OCR misreads of "kg" as "ka", "kq", etc.
 	if (/^\d+(\.\d+)?\s*k[a-z]\b/i.test(cleanLine)) return null
 	if (/\bk[a-z]\b.*\$\d+[.,]\d{2}/i.test(cleanLine)) return null
 	if (NOISE_PATTERNS.some((pattern) => pattern.test(cleanLine))) return null
@@ -122,45 +187,101 @@ function dedupeItems(items: OcrDraftItem[]): OcrDraftItem[] {
 
 	for (const item of items) {
 		const key = item.name.toLowerCase().trim()
-		if (!key) continue
+		if (!key || unique.has(key)) continue
 
-		if (!unique.has(key)) {
-			unique.set(key, {
-				name: item.name,
-				quantity: item.quantity,
-				confidence: item.confidence,
-			})
-		}
+		unique.set(key, {
+			name: item.name,
+			quantity: item.quantity,
+			confidence: item.confidence,
+		})
 	}
 
 	return Array.from(unique.values()).slice(0, 20)
 }
 
-export async function extractReceiptDraftItems(imageBytes: Uint8Array): Promise<OcrExtractionResult> {
-	if (!TESSERACT_ENABLED) {
+function failedOutcome(
+	stage: OcrFailureStage,
+	category: string,
+	terminationFailed = false,
+): OcrExtractionResult {
+	return {
+		status: "FAILED",
+		items: [],
+		fallbackUsed: false,
+		failure: {
+			stage,
+			category,
+			...(terminationFailed ? { terminationFailed: true } : {}),
+		},
+	}
+}
+
+function createWorkerSafely(
+	tesseract: TesseractModule,
+	options: Record<string, unknown>,
+): Promise<OcrWorker> {
+	return new Promise((resolve, reject) => {
+		let settled = false
+		const rejectOnce = (error: unknown) => {
+			if (settled) return
+			settled = true
+			reject(error)
+		}
+
+		const workerPromise = tesseract.createWorker("eng", 1, {
+			...options,
+			// Prevent Tesseract.js worker job errors from becoming uncaught throws.
+			errorHandler: rejectOnce,
+		})
+
+		workerPromise.then(
+			(worker) => {
+				if (settled) {
+					void worker.terminate().catch(() => undefined)
+					return
+				}
+				settled = true
+				resolve(worker)
+			},
+			rejectOnce,
+		)
+	})
+}
+
+export async function extractReceiptDraftItems(
+	imageBytes: Uint8Array,
+): Promise<OcrExtractionResult> {
+	if (!isOcrEnabled()) {
 		return {
+			status: "DISABLED",
 			items: [],
 			fallbackUsed: false,
 		}
 	}
 
-	try {
-		const tesseract = await import("tesseract.js")
-		// Tesseract typings expect an ImageLike (e.g. Buffer), so wrap the
-		// Uint8Array from storage in a Node Buffer for type safety.
-		const input = Buffer.from(imageBytes)
-		const workerOptions: Record<string, unknown> = {
-			langPath: TESSERACT_LANG_PATH,
-			cachePath: TESSERACT_CACHE_PATH,
-			gzip: false,
-		}
-		if (RESOLVED_WORKER_PATH) {
-			workerOptions.workerPath = RESOLVED_WORKER_PATH
-		}
-		const worker = await tesseract.createWorker("eng", 1, workerOptions)
-		const result = await worker.recognize(input)
-		await worker.terminate()
+	const runtimeAssets = resolveOcrRuntimeAssets()
+	if (!runtimeAssets) {
+		return failedOutcome("INITIALIZATION", "OCR_RUNTIME_ASSET_MISSING")
+	}
 
+	let worker: OcrWorker | undefined
+	let outcome: OcrExtractionResult | undefined
+	let stage: OcrFailureStage = "INITIALIZATION"
+
+	try {
+		const tesseract = (await import("tesseract.js")) as unknown as TesseractModule
+		worker = await createWorkerSafely(tesseract, {
+			langPath: runtimeAssets.langPath,
+			workerPath: runtimeAssets.workerPath,
+			cachePath: process.env.VERCEL ? "/tmp" : runtimeAssets.langPath,
+			cacheMethod: "none",
+			gzip: false,
+		})
+
+		stage = "RECOGNITION"
+		const result = await worker.recognize(Buffer.from(imageBytes))
+
+		stage = "PARSING"
 		const text = result?.data?.text ?? ""
 		const confidenceRaw = result?.data?.confidence
 		const confidence =
@@ -168,33 +289,61 @@ export async function extractReceiptDraftItems(imageBytes: Uint8Array): Promise<
 				? Math.max(0, Math.min(1, confidenceRaw / 100))
 				: null
 
-		const ocrParsed = text
-			.split(/\r?\n/)
-			.map((line) => parseLineToItem(line, confidence))
-			.filter((item): item is OcrDraftItem => item !== null)
+		const ocrItems = dedupeItems(
+			text
+				.split(/\r?\n/)
+				.map((line) => parseLineToItem(line, confidence))
+				.filter((item): item is OcrDraftItem => item !== null),
+		)
 
-		const normalizedOcrItems = dedupeItems(ocrParsed)
-		if (normalizedOcrItems.length > 0) {
-			return {
-				items: normalizedOcrItems,
+		if (ocrItems.length > 0) {
+			outcome = {
+				status: "SUCCESS",
+				items: ocrItems,
 				fallbackUsed: false,
 			}
-		}
+		} else {
+			const fallbackItems = dedupeItems(
+				parseFallbackReceiptItems(text).map((item) => ({
+					name: item.name,
+					quantity: item.quantity,
+					confidence: null,
+				})),
+			)
 
-		const fallbackItems = parseFallbackReceiptItems(text).map((item) => ({
-			name: item.name,
-			quantity: item.quantity,
-			confidence: null,
-		}))
-
-		return {
-			items: dedupeItems(fallbackItems),
-			fallbackUsed: fallbackItems.length > 0,
+			outcome = fallbackItems.length > 0
+				? {
+					status: "FALLBACK_USED",
+					items: fallbackItems,
+					fallbackUsed: true,
+				}
+				: {
+					status: "NO_ITEMS",
+					items: [],
+					fallbackUsed: false,
+				}
 		}
 	} catch {
-		return {
-			items: [],
-			fallbackUsed: false,
+		const category =
+			stage === "INITIALIZATION"
+				? "OCR_WORKER_INITIALIZATION_FAILED"
+				: stage === "RECOGNITION"
+					? "OCR_RECOGNITION_FAILED"
+					: "OCR_PARSING_FAILED"
+		outcome = failedOutcome(stage, category)
+	} finally {
+		if (worker) {
+			try {
+				await worker.terminate()
+			} catch {
+				if (outcome?.status === "FAILED" && outcome.failure) {
+					outcome.failure.terminationFailed = true
+				} else {
+					outcome = failedOutcome("TERMINATION", "OCR_WORKER_TERMINATION_FAILED")
+				}
+			}
 		}
 	}
+
+	return outcome ?? failedOutcome("INITIALIZATION", "OCR_UNKNOWN_FAILURE")
 }

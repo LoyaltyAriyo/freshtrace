@@ -76,6 +76,33 @@ type ItemIssue =
 
 const LOW_CONFIDENCE_THRESHOLD = 0.6
 
+function getEmptyOcrContent(ocrStatus: string): {
+  testId: string
+  message: string
+} {
+  if (ocrStatus === "PENDING") {
+    return {
+      testId: "ocr-disabled",
+      message:
+        "Receipt scanning is disabled for this deployment. Ask the app administrator to enable server-side OCR, then return to Scan and upload the receipt again, or add items manually.",
+    }
+  }
+
+  if (ocrStatus === "FAILED") {
+    return {
+      testId: "ocr-failed",
+      message:
+        "We couldn't process this receipt because scanning failed. Return to Scan and try the upload again, or add items manually.",
+    }
+  }
+
+  return {
+    testId: "ocr-no-items",
+    message:
+      "No items were detected from this receipt. You can return to Scan and try uploading a clearer photo, or add items manually from the Manual Entry page.",
+  }
+}
+
 function mapDraftItems(rawDraftItems: unknown): DraftItem[] {
   if (!Array.isArray(rawDraftItems)) return []
 
@@ -741,23 +768,21 @@ function ReviewPageContent() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {receipt.draftItems.length === 0 ? (
-              receipt.ocrStatus === "PENDING" ? (
-                <p
-                  className="text-sm text-muted-foreground"
-                  data-testid="ocr-pending"
-                >
-                  We couldn&apos;t extract any items from this receipt yet. The
-                  OCR scan may have failed or is taking longer than expected.
-                  You can try uploading a clearer photo, or add items manually
-                  from the Manual Entry page.
-                </p>
-              ) : (
+              <div
+                className="flex flex-col items-start gap-3"
+                data-testid={getEmptyOcrContent(receipt.ocrStatus).testId}
+              >
                 <p className="text-sm text-muted-foreground">
-                  No items were detected from this receipt. You can go back and
-                  try uploading a clearer photo, or add items manually from the
-                  Manual Entry page.
+                  {getEmptyOcrContent(receipt.ocrStatus).message}
                 </p>
-              )
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/scan")}
+                >
+                  Return to scan
+                </Button>
+              </div>
             ) : (
               <>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
