@@ -1,0 +1,115 @@
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import SignupPage from "./page"
+
+const { push } = vi.hoisted(() => ({ push: vi.fn() }))
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }))
+const fetchMock = vi.fn()
+function response(data: unknown, status = 200) { return Response.json(data, { status }) }
+function fill() {
+  fireEvent.change(screen.getByLabelText("Full Name"), { target: { value: "Test User" } })
+  fireEvent.change(screen.getByLabelText("Email"), { target: { value: "test@example.com" } })
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "fake-password" } })
+  fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "fake-password" } })
+}
+function submit() { fireEvent.submit(screen.getByRole("form", { name: "Create an account" })) }
+beforeEach(() => {
+  fetchMock.mockReset()
+  push.mockReset()
+  vi.stubGlobal("fetch", fetchMock)
+})
+afterEach(() => vi.unstubAllGlobals())
+
+describe("signup confirmation and login", () => {
+  it("keeps an accessible confirmation success state without login or duplicate signup", async () => {
+    fetchMock.mockResolvedValue(response({ confirmationRequired: true }, 201))
+    render(<SignupPage />)
+    fill()
+    submit()
+    expect(await screen.findByRole("status")).toHaveTextContent(/check your email.*confirm.*sign in/i)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/auth/signup")
+    expect(push).not.toHaveBeenCalled()
+    expect(screen.getByRole("button", { name: "Sign Up" })).toBeDisabled()
+    expect(screen.getByLabelText("Password")).toHaveValue("")
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login")
+    fill()
+    submit()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole("status")).toBeVisible()
+  })
+  it.each([["ADMIN", "/admin"], ["USER", "/"], [null, "/"]])(
+    "automatically logs in and routes %s to %s without a JSON access token", async (role, destination) => {
+      fetchMock.mockResolvedValueOnce(response({ confirmationRequired: false }, 201))
+        .mockResolvedValueOnce(response({ user: { id: "fake-id", email: "test@example.com", role } }))
+      render(<SignupPage />)
+      fill()
+      submit()
+      await waitFor(() => expect(push).toHaveBeenCalledExactlyOnceWith(destination))
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock.mock.calls[1][0]).toBe("/api/auth/login")
+      expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ email: "test@example.com", password: "fake-password" })
+    },
+  )
+  it("blocks same-tick duplicate submissions and exposes the loading state", async () => {
+    let resolve!: (value: Response) => void
+    fetchMock.mockReturnValue(new Promise<Response>((done) => { resolve = done }))
+    render(<SignupPage />)
+    fill()
+    act(() => { submit(); submit() })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole("form")).toHaveAttribute("aria-busy", "true")
+    expect(screen.getByRole("button", { name: "Creating account..." })).toBeDisabled()
+    await act(async () => resolve(response({ confirmationRequired: true }, 201)))
+    expect(screen.getByRole("form")).toHaveAttribute("aria-busy", "false")
+  })
+  it("shows validation errors without sending a request", () => {
+    render(<SignupPage />)
+    submit()
+    expect(screen.getByRole("alert")).toHaveTextContent("Please fill in all fields.")
+    fill()
+    fireEvent.change(screen.getByLabelText("Confirm Password"), { target: { value: "mismatch" } })
+    submit()
+    expect(screen.getByRole("alert")).toHaveTextContent("Passwords do not match.")
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+  it("shows a safe API error and allows a retry", async () => {
+    fetchMock.mockResolvedValueOnce(response({ error: "Too many signup attempts. Please wait a moment and try again." }, 429))
+      .mockResolvedValueOnce(response({ confirmationRequired: true }, 201))
+    render(<SignupPage />)
+    fill()
+    submit()
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many signup attempts")
+    expect(screen.getByRole("button", { name: "Sign Up" })).toBeEnabled()
+    submit()
+    expect(await screen.findByRole("status")).toHaveTextContent("Check your email")
+  })
+  it("does not display raw thrown errors", async () => {
+    fetchMock.mockRejectedValue(new Error("FAKE_SECRET_PROVIDER_DETAIL"))
+    render(<SignupPage />)
+    fill()
+    submit()
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to complete the request")
+    expect(document.body.textContent).not.toContain("FAKE_SECRET_PROVIDER_DETAIL")
+    expect(push).not.toHaveBeenCalled()
+  })
+  it("does not attempt login for a malformed success response", async () => {
+    fetchMock.mockResolvedValue(response({ message: "created" }, 201))
+    render(<SignupPage />)
+    fill()
+    submit()
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to confirm account creation")
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+  it("preserves manual sign-in recovery when automatic login fails", async () => {
+    fetchMock.mockResolvedValueOnce(response({ confirmationRequired: false }, 201))
+      .mockResolvedValueOnce(response({ error: "Login failed. Please try again." }, 500))
+    render(<SignupPage />)
+    fill()
+    submit()
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/login"))
+    expect(screen.getByRole("status")).toHaveTextContent("Please sign in")
+    submit()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})

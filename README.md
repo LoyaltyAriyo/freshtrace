@@ -198,6 +198,7 @@ DIRECT_URL="postgresql://user:password@localhost:5432/freshtrace"
 NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="your-public-anon-key"
 SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_ANON_KEY="your-public-anon-key"
 SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
 ADMIN_EMAIL="admin@example.com"
 ADMIN_PASSWORD="change-me"
@@ -205,6 +206,37 @@ ADMIN_FULL_NAME="Admin User"
 ```
 
 Real secrets must never be committed to the repository. Keep production or shared credentials outside version control and use environment-specific secret management where appropriate.
+
+### Signup and email confirmation
+
+Public signup uses Supabase's standard email/password signup endpoint and its Auth
+rate limits. Set server-side `SUPABASE_URL` and `SUPABASE_ANON_KEY` to the same
+project URL and publishable/anon key as their `NEXT_PUBLIC_` equivalents. Never
+use the service-role key as an anon key.
+
+Supabase's **Confirm email** setting controls the signup experience:
+
+- Enabled: FreshTrace creates the application profile, then displays a persistent
+  message asking the user to confirm their email and sign in. No automatic login
+  is attempted before confirmation.
+- Disabled: signup is followed by login, which establishes Supabase session
+  cookies and routes administrators to `/admin` and other users to `/`.
+
+Signup returns only a success message and `confirmationRequired`; login returns
+only the user ID, email, and application role. Session credentials remain in the
+Supabase cookie flow, not login JSON. Production login cookies use HTTPS-only
+`Secure` and `SameSite=Lax` attributes. Redirect URL configuration is a separate
+deployment step; this change does not configure production redirects.
+
+A server-generated `signup_attempt_id` metadata marker and a real email identity
+distinguish a newly created identity from Supabase's existing-account responses.
+This marker is not an authorization claim. Duplicate or ambiguous identities are
+never linked or deleted by signup. Profile creation uses the new Supabase UUID;
+if it fails, the service-role client is used only to delete that new identity.
+If deletion fails, a sanitized `CRITICAL` `SIGNUP_COMPENSATION_FAILED` operational
+log includes correlation IDs for manual reconciliation. Monitor server logs for
+this event; no automatic broad cleanup or retry is performed. Existing orphaned
+accounts require authorized reconciliation, not another public signup attempt.
 
 ## Prisma / PostgreSQL Notes
 

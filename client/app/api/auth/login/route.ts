@@ -3,15 +3,23 @@ import { parse as parseCookie, serialize as serializeCookie } from "cookie"
 import { prisma } from "@/lib/prisma"
 
 export async function POST(request: Request) {
+  try {
+    return await login(request)
+  } catch {
+    return Response.json({ error: "Login failed. Please try again." }, { status: 500 })
+  }
+}
+
+async function login(request: Request) {
   const body = await request.json().catch(() => null)
 
-  if (!body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
     return Response.json({ error: "Invalid request body." }, { status: 400 })
   }
 
   const { email, password } = body
 
-  if (!email || !password) {
+  if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password) {
     return Response.json(
       { error: "Email and password are required." },
       { status: 400 }
@@ -37,6 +45,7 @@ export async function POST(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: { secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" },
       cookies: {
         getAll: getAllCookies,
         setAll(cookies, headers) {
@@ -55,35 +64,39 @@ export async function POST(request: Request) {
   if (error) {
     const msg = error.message.toLowerCase()
 
-    if (msg.includes("invalid login") || msg.includes("invalid credentials") || msg.includes("invalid email or password")) {
-      return Response.json(
-        { error: "Invalid email or password." },
-        { status: 401 }
-      )
-    }
-
-    if (msg.includes("email not confirmed")) {
-      return Response.json(
-        { error: "Please confirm your email address before signing in. Check your inbox." },
-        { status: 403 }
-      )
-    }
-
-    if (msg.includes("disabled") || msg.includes("banned")) {
-      return Response.json(
-        { error: "Your account has been disabled. Please contact support." },
-        { status: 403 }
-      )
-    }
-
-    if (msg.includes("rate limit") || msg.includes("too many requests")) {
+    if (error.status === 429 || error.code === "over_request_rate_limit" || msg.includes("rate limit") || msg.includes("too many requests")) {
       return Response.json(
         { error: "Too many login attempts. Please wait a moment and try again." },
         { status: 429 }
       )
     }
 
+    if (error.code === "invalid_credentials" || msg.includes("invalid login") || msg.includes("invalid credentials") || msg.includes("invalid email or password")) {
+      return Response.json(
+        { error: "Invalid email or password." },
+        { status: 401 }
+      )
+    }
+
+    if (error.code === "email_not_confirmed" || msg.includes("email not confirmed")) {
+      return Response.json(
+        { error: "Please confirm your email address before signing in. Check your inbox." },
+        { status: 403 }
+      )
+    }
+
+    if (error.code === "user_banned" || msg.includes("disabled") || msg.includes("banned")) {
+      return Response.json(
+        { error: "Your account has been disabled. Please contact support." },
+        { status: 403 }
+      )
+    }
+
     return Response.json({ error: "Login failed. Please try again." }, { status: 400 })
+  }
+
+  if (!data.user || !data.session) {
+    return Response.json({ error: "Login failed. Please try again." }, { status: 500 })
   }
 
   let appUser: { role: string | null } | null = null
@@ -102,15 +115,12 @@ export async function POST(request: Request) {
       email: data.user.email,
       role: appUser?.role ?? null,
     },
-    session: {
-      accessToken: data.session.access_token,
-      expiresAt: data.session.expires_at,
-    },
   })
 
   Object.entries(responseHeaders).forEach(([key, value]) => {
     response.headers.set(key, value)
   })
+  response.headers.set("Cache-Control", "private, no-store")
 
   cookiesToSet.forEach((cookie) => {
     response.headers.append(

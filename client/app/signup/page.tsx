@@ -1,13 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong"
-}
 
 export default function SignupPage() {
   const router = useRouter()
@@ -19,9 +15,13 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState("")
+  const inFlight = useRef(false)
+  const accountCreated = useRef(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (inFlight.current || accountCreated.current) return
     if (!name || !email || !password || !confirm) {
       setError("Please fill in all fields.")
       return
@@ -30,6 +30,7 @@ export default function SignupPage() {
       setError("Passwords do not match.")
       return
     }
+    inFlight.current = true
     setLoading(true)
     setError("")
     try {
@@ -58,7 +59,20 @@ export default function SignupPage() {
         return
       }
 
-      // Attempt automatic sign-in so the user lands on the correct dashboard.
+      if (typeof data?.confirmationRequired !== "boolean") {
+        setError("Unable to confirm account creation. Please try signing in or contact support.")
+        return
+      }
+      accountCreated.current = true
+      setPassword("")
+      setConfirm("")
+      if (data.confirmationRequired) {
+        setSuccess("Account created. Check your email to confirm your account, then return here to sign in.")
+        return
+      }
+      setSuccess("Account created. Signing you in...")
+
+      // Only attempt automatic sign-in when Supabase did not require confirmation.
       const loginResponse = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -70,6 +84,7 @@ export default function SignupPage() {
       const loginData = await loginResponse.json().catch(() => null)
 
       if (!loginResponse.ok) {
+        setSuccess("Account created. Please sign in to continue.")
         const apiError =
           (loginData && (loginData.error || loginData.message)) ?? null
         setError(
@@ -88,9 +103,11 @@ export default function SignupPage() {
       } else {
         router.push("/")
       }
-    } catch (error: unknown) {
-      setError(getErrorMessage(error))
+    } catch {
+      if (accountCreated.current) setSuccess("Account created. Please sign in to continue.")
+      setError("Unable to complete the request. Please try again or sign in if your account was created.")
     } finally {
+      inFlight.current = false
       setLoading(false)
     }
   }
@@ -103,9 +120,14 @@ export default function SignupPage() {
           <p className="mt-1 text-sm text-muted-foreground">Start tracking your food with Fresh Trace</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} aria-label="Create an account" aria-busy={loading} className="flex flex-col gap-4">
+          {success && (
+            <div role="status" className="rounded-md bg-primary/10 px-4 py-3 text-sm">
+              {success}
+            </div>
+          )}
           {error && (
-            <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div role="alert" className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {error}
             </div>
           )}
@@ -190,7 +212,7 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !!success}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {loading ? "Creating account..." : "Sign Up"}
