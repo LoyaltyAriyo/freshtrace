@@ -293,6 +293,48 @@ Client generation runs during installation and before the Next.js build.
 Database migrations, category seeding, and admin bootstrap remain separate
 release operations and must not run as part of the Vercel build.
 
+### Daily database keepalive
+
+With Vercel Root Directory set to `client`, `client/vercel.json` schedules
+`GET /api/cron/keepalive` once daily using `17 9 * * *` (09:17 UTC).
+On Vercel Hobby the invocation may occur at any time during the 09:00–09:59 UTC
+hour; do not increase this to more than once daily. Cron runs only on production
+deployments, and Vercel does not automatically retry failed invocations.
+
+The Node.js endpoint requires the exact `Authorization: Bearer <CRON_SECRET>`
+header. Generate a secret privately using a password manager or cryptographically
+secure generator: at least 16 characters, preferably 32 random bytes or stronger
+(for example, 32 random bytes encoded as hex). Configure the same `CRON_SECRET`
+in the Vercel project's **Production** environment before deploying. Vercel
+automatically sends it in the Bearer header. Never use a `NEXT_PUBLIC_` variable,
+put the secret in a URL, or commit its value. `.env.example` deliberately leaves
+it empty. This setup does not require changing `client/.env.local`.
+
+After authentication, each successful invocation uses the existing Prisma
+singleton for exactly three sequential, parameterless `SELECT 1` queries. It
+does not read user records or modify data, and duplicate invocations are safe.
+Responses contain only `{ "ok": true }` on success (HTTP 200), or
+`{ "ok": false }` on failure, always with `Cache-Control: no-store`.
+Missing or incorrect authorization returns 401; missing/short `CRON_SECRET`,
+invalid database configuration, or a database failure returns 503. Only database
+operation failures produce a fixed console message. Prisma's automatic raw
+error logging is disabled; existing application-level logging remains in place.
+The existing middleware excludes API routes, so this endpoint does not require
+a user session and returns directly without a login redirect.
+
+After a production deployment, inspect **Project Settings → Cron Jobs** for the
+registered schedule and execution history, and the project's runtime **Logs**
+filtered to `/api/cron/keepalive` for outcomes. Investigate failures there; the
+endpoint deliberately excludes query results and internal details.
+
+This small amount of genuine PostgreSQL activity may reduce inactivity-pausing
+risk on Supabase Free, but does not guarantee availability or prevent pausing.
+Paid Supabase plans provide protection against inactivity pausing; even a paid
+plan is not a guarantee against all outages. See the official
+[Vercel cron management guide](https://vercel.com/docs/cron-jobs/manage-cron-jobs),
+[Hobby cron limits](https://vercel.com/docs/cron-jobs/usage-and-pricing), and
+[Supabase project-pausing policy](https://supabase.com/docs/guides/platform/free-project-pausing).
+
 ## Admin Bootstrap Script
 
 The admin bootstrap utility promotes one existing, email-confirmed account.

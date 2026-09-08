@@ -13,7 +13,9 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ["error"],
+    // Route handlers own error reporting. Automatic Prisma output can disclose
+    // connection details before a caller has a chance to sanitize the failure.
+    log: [],
     datasources: {
       db: {
         url: dbUrl,
