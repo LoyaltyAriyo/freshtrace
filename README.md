@@ -201,9 +201,8 @@ SUPABASE_URL="https://your-project.supabase.co"
 SUPABASE_ANON_KEY="your-public-anon-key"
 SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
 TESSERACT_ENABLED="false"
-ADMIN_EMAIL="admin@example.com"
-ADMIN_PASSWORD="change-me"
-ADMIN_FULL_NAME="Admin User"
+ADMIN_EMAIL=""
+ADMIN_CREATE_IF_MISSING="false"
 ```
 
 Real secrets must never be committed to the repository. Keep production or shared credentials outside version control and use environment-specific secret management where appropriate.
@@ -296,7 +295,9 @@ release operations and must not run as part of the Vercel build.
 
 ## Admin Bootstrap Script
 
-FreshTrace includes an admin bootstrap utility for provisioning or reconciling an administrative account across Supabase Auth and the application database.
+The admin bootstrap utility promotes one existing, email-confirmed account.
+It never creates Auth identities or application profiles. Register and verify
+the account through the normal signup flow first.
 
 Run it from `client/`, or use the same command from the repository root:
 
@@ -304,17 +305,38 @@ Run it from `client/`, or use the same command from the repository root:
 npm run bootstrap:admin
 ```
 
-Required environment variables:
+Required server configuration:
 
 - `DATABASE_URL`
 - `DIRECT_URL` (used by the automatic pre-bootstrap Prisma generation step)
 - `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
-- `ADMIN_FULL_NAME`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-The script creates or reuses a Supabase Auth admin account and then creates or updates the matching Prisma `User` record so the administrative user state remains synchronized across authentication and database layers.
+Supply `ADMIN_EMAIL` privately for the process, using your shell or secret
+manager. Do not commit a real email or credentials. The normal environment
+loader reads ignored `client/.env.local` before `client/.env`; already exported
+variables take precedence. The script does not rewrite either file.
+
+`ADMIN_PASSWORD` and `ADMIN_FULL_NAME` are neither required nor read.
+`ADMIN_CREATE_IF_MISSING` should be absent or `false`; setting it to exactly
+`true` is explicitly rejected. Account creation is not supported by this tool.
+
+Before writing, the script exhausts Auth pagination and requires exactly one
+case-insensitive email match in each system, a confirmed Auth email, an existing
+Prisma profile, and identical UUIDs. Missing, duplicate, mismatched, or changing
+records cause refusal. A serializable transaction updates only `role=ADMIN`
+and `accountStatus=ACTIVE` (Prisma also maintains `updatedAt`). ID, email, full
+name, and related records are preserved. Auth password, confirmation, metadata,
+and sessions are never modified. Rerunning an already active administrator is a
+read-only success and does not change its timestamp.
+
+The command prints only sanitized outcomes and aggregate verification counts.
+It checks that user counts, Auth state, profile fields and related-record
+membership remain unchanged. Failed verification rolls back the application
+update; provider errors and credentials are not printed. Auth and PostgreSQL
+cannot share an atomic transaction, so avoid concurrent account administration
+while running this one-off command.
 
 ## Team Collaboration
 
