@@ -8,6 +8,8 @@ const messages = Object.freeze({
   AUTH_MISSING: "No matching Auth account exists; creation is disabled.",
   AUTH_DUPLICATE: "Multiple Auth email matches exist.",
   AUTH_UNCONFIRMED: "The Auth email must be confirmed before promotion.",
+  AUTH_RESTRICTED: "The Auth account is explicitly restricted.",
+  AUTH_RESTRICTION_INVALID: "Exposed Auth restriction state could not be verified.",
   PROFILE_MISSING: "An existing application profile is required.",
   PROFILE_DUPLICATE: "Multiple application email matches exist.",
   ID_MISMATCH: "Auth and application identities do not match.",
@@ -76,10 +78,70 @@ function requireConfirmedMatch(matches) {
   if (!matches.length) refuse("AUTH_MISSING")
   if (matches.length !== 1) refuse("AUTH_DUPLICATE")
   const user = matches[0]
-  if (!user.email_confirmed_at || !Number.isFinite(Date.parse(user.email_confirmed_at))) {
+  if (typeof user.email_confirmed_at !== "string" ||
+      !user.email_confirmed_at || !Number.isFinite(Date.parse(user.email_confirmed_at))) {
     refuse("AUTH_UNCONFIRMED")
   }
   return user
+}
+
+function restrictionState(user, field, now) {
+  const available = Object.hasOwn(user, field)
+  if (!available) return { available: false, restricted: false }
+  const value = user[field]
+  if (value === null || value === "") return { available: true, restricted: false }
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) {
+    refuse("AUTH_RESTRICTION_INVALID")
+  }
+  return { available: true, restricted: field === "deleted_at" || Date.parse(value) > now }
+}
+
+async function readAuthPrerequisites(admin, email) {
+  const scan = await scanAuth(admin, email)
+  const listed = requireConfirmedMatch(scan.matches)
+  const { data, error } = await admin.getUserById(listed.id)
+  if (error || !data?.user) refuse("AUTH_LOOKUP_FAILED")
+  const detailed = requireConfirmedMatch([data.user])
+  if (detailed.id !== listed.id || normalizeEmail(detailed.email) !== email) {
+    refuse("PRECONDITION_CHANGED")
+  }
+
+  // These are the restriction fields exposed by the installed Supabase User API.
+  // Auth disabling is represented by a ban; there is no separate disabled field.
+  // Keep endpoint availability separately: absence must not conceal a lost signal.
+  const now = Date.now()
+  const restrictions = {}
+  for (const field of ["banned_until", "deleted_at"]) {
+    restrictions[field] = {
+      listed: restrictionState(listed, field, now),
+      detailed: restrictionState(detailed, field, now),
+    }
+    if (Object.values(restrictions[field]).some((state) => state.restricted)) {
+      refuse("AUTH_RESTRICTED")
+    }
+  }
+  return {
+    count: scan.count,
+    snapshot: {
+      id: detailed.id,
+      email: normalizeEmail(detailed.email),
+      emailConfirmed: true,
+      matchCount: scan.matches.length,
+      restrictions,
+    },
+  }
+}
+
+async function recheckAuth(admin, email, before, failureCode) {
+  try {
+    const current = await readAuthPrerequisites(admin, email)
+    // Only this explicitly constructed snapshot is compared, never provider objects.
+    if (current.count !== before.count || !isDeepStrictEqual(current.snapshot, before.snapshot)) {
+      refuse(failureCode)
+    }
+  } catch {
+    refuse(failureCode)
+  }
 }
 
 const profileSelect = {
@@ -119,18 +181,15 @@ export async function promoteExistingAdmin({ env, prisma, admin }) {
   if (!email) refuse("EMAIL_REQUIRED")
   if (env.ADMIN_CREATE_IF_MISSING === "true") refuse("CREATION_UNSUPPORTED")
 
-  const authBefore = await scanAuth(admin, email)
-  const authUser = requireConfirmedMatch(authBefore.matches)
+  const authBefore = await readAuthPrerequisites(admin, email)
+  const authUser = authBefore.snapshot
 
   // No password or full-name lookup is needed for an existing profile.
   // Auth is read-only throughout this workflow.
   return prisma.$transaction(async (tx) => {
     const profile = requireProfile(await matchingProfiles(tx, email), authUser)
     const usersBefore = await tx.user.count()
-    const currentAuth = await admin.getUserById(authUser.id)
-    if (currentAuth.error || !isDeepStrictEqual(currentAuth.data?.user, authUser)) {
-      refuse("PRECONDITION_CHANGED")
-    }
+    await recheckAuth(admin, email, authBefore, "PRECONDITION_CHANGED")
 
     const unchanged = profile.role === "ADMIN" && profile.accountStatus === "ACTIVE"
     if (!unchanged) {
@@ -145,14 +204,12 @@ export async function promoteExistingAdmin({ env, prisma, admin }) {
     }
 
     const after = requireProfile(await matchingProfiles(tx, email), authUser)
-    const authAfter = await scanAuth(admin, email)
+    await recheckAuth(admin, email, authBefore, "VERIFICATION_FAILED")
     if (
       after.role !== "ADMIN" || after.accountStatus !== "ACTIVE" ||
       !isDeepStrictEqual(preservedProfile(profile), preservedProfile(after)) ||
       (unchanged && !isDeepStrictEqual(profile, after)) ||
-      usersBefore !== await tx.user.count() ||
-      authBefore.count !== authAfter.count ||
-      !isDeepStrictEqual(authBefore.matches, authAfter.matches)
+      usersBefore !== await tx.user.count()
     ) {
       refuse("VERIFICATION_FAILED")
     }
@@ -165,7 +222,9 @@ export async function promoteExistingAdmin({ env, prisma, admin }) {
       profileMatches: 1,
       emailConfirmed: true,
       identitiesMatch: true,
-      authUnchanged: true,
+      authPrerequisitesUnchanged: true,
+      noExposedAuthRestrictions: true,
+      authUsersModified: 0,
       profilePreserved: true,
       authUsersCreated: 0,
       applicationUsersCreated: 0,

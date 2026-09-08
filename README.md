@@ -332,11 +332,22 @@ and sessions are never modified. Rerunning an already active administrator is a
 read-only success and does not change its timestamp.
 
 The command prints only sanitized outcomes and aggregate verification counts.
-It checks that user counts, Auth state, profile fields and related-record
+It checks that user counts, Auth prerequisites, profile fields and related-record
 membership remain unchanged. Failed verification rolls back the application
 update; provider errors and credentials are not printed. Auth and PostgreSQL
 cannot share an atomic transaction, so avoid concurrent account administration
 while running this one-off command.
+
+Each initial, pre-write, and post-write Auth check fully paginates the email
+lookup and retrieves the matching account by UUID. Only UUID, normalized email,
+confirmed-email state, uniqueness, and exposed restriction states are compared.
+Supabase's supported `banned_until` and `deleted_at` fields are checked on both
+endpoints, retaining field availability separately; an active ban (Auth disabling),
+deletion, malformed restriction value, or changing availability causes refusal.
+Absent restriction fields do not independently prove that an account is unrestricted.
+Identity-provider arrays, metadata, session fields, property ordering, and harmless
+timestamp changes are excluded. Confirmation timestamps only establish confirmation;
+ban timestamps only establish whether the ban is active.
 
 ## Team Collaboration
 

@@ -77,6 +77,20 @@ async function expectRefusal(f, code) {
   expectNoAuthWrites(f)
 }
 
+function detailSequence(f, users) {
+  for (const user of users) {
+    f.admin.getUserById.mockResolvedValueOnce({ data: { user }, error: null })
+  }
+}
+
+function scanSequence(f, scans) {
+  for (const pages of scans) {
+    for (const users of [...pages, []]) {
+      f.admin.listUsers.mockResolvedValueOnce({ data: { users }, error: null })
+    }
+  }
+}
+
 describe("existing admin promotion", () => {
   it("promotes only the confirmed matching profile and preserves its identity and relations", async () => {
     const f = fixture()
@@ -193,22 +207,152 @@ describe("existing admin promotion", () => {
 
   it("rejects confirmation changes immediately before mutation", async () => {
     const f = fixture()
-    f.admin.getUserById.mockResolvedValue({
-      data: { user: { ...auth, email_confirmed_at: null } }, error: null,
-    })
+    detailSequence(f, [auth, { ...auth, email_confirmed_at: null }])
     await expectRefusal(f, "PRECONDITION_CHANGED")
   })
 
   it("rolls back if post-update verification detects changed Auth state", async () => {
     const f = fixture()
-    f.admin.listUsers
-      .mockResolvedValueOnce({ data: { users: [auth] }, error: null })
-      .mockResolvedValueOnce({ data: { users: [] }, error: null })
-      .mockResolvedValueOnce({ data: { users: [{ ...auth, email_confirmed_at: null }] }, error: null })
-      .mockResolvedValueOnce({ data: { users: [] }, error: null })
+    detailSequence(f, [auth, auth, { ...auth, email_confirmed_at: null }])
     await expect(f.run()).rejects.toThrow("VERIFICATION_FAILED")
     expect(f.rows()).toEqual([profile])
     expectNoAuthWrites(f)
+  })
+
+  it("allows list identities null versus detailed identities array at every check", async () => {
+    const f = fixture({ pages: [[{ ...auth, identities: null }], []] })
+    await expect(f.run()).resolves.toMatchObject({ outcome: "PROMOTED",
+      authPrerequisitesUnchanged: true, authUsersModified: 0 })
+    expect(f.admin.getUserById).toHaveBeenCalledTimes(3)
+    expect(f.admin.listUsers).toHaveBeenCalledTimes(6)
+    expectNoAuthWrites(f)
+  })
+
+  it.each([
+    ["provider array ordering", { identities: [{ provider: "email" }, { provider: "oauth" }] },
+      { identities: [{ provider: "oauth" }, { provider: "email" }] }],
+    ["confirmation and incidental timestamps", {}, {
+      email_confirmed_at: "2026-03-01T00:00:00Z", created_at: "2026-02-01T00:00:00Z",
+      updated_at: "2026-04-01T00:00:00Z", last_sign_in_at: "2026-05-01T00:00:00Z",
+    }],
+    ["application and user metadata", {}, { app_metadata: { providers: ["email"] },
+      user_metadata: { full_name: "Another Synthetic Name" } }],
+    ["normalized email casing and whitespace", {}, { email: "  VERIFIED@example.test " }],
+    ["session and irrelevant fields", {}, { session_id: "synthetic-session", aud: "authenticated" }],
+  ])("ignores harmless %s during pre- and post-update verification", async (_, initial, changed) => {
+    const f = fixture()
+    scanSequence(f, [[[{ ...auth, ...initial }]], [[{ ...auth, ...changed }]], [[auth]]])
+    detailSequence(f, [{ ...auth, ...initial }, { ...auth, ...changed }, { ...auth, ...changed }])
+    await expect(f.run()).resolves.toMatchObject({ outcome: "PROMOTED" })
+    expect(f.user.updateMany).toHaveBeenCalledTimes(1)
+    expectNoAuthWrites(f)
+  })
+
+  it("ignores object property ordering", async () => {
+    const f = fixture()
+    detailSequence(f, [auth, Object.fromEntries(Object.entries(auth).reverse()), auth])
+    await expect(f.run()).resolves.toMatchObject({ outcome: "PROMOTED" })
+  })
+
+  it.each([
+    ["UUID", { id: "22222222-2222-4222-8222-222222222222" }],
+    ["normalized email", { email: "different@example.test" }],
+    ["confirmation", { email_confirmed_at: null }],
+    ["active ban / Auth disabling", { banned_until: "9999-01-01T00:00:00Z" }],
+    ["deletion", { deleted_at: "2026-01-01T00:00:00Z" }],
+    ["newly exposed restriction state", { banned_until: null }],
+  ])("rejects changed %s before mutation and rolls back after mutation", async (_, change) => {
+    const pre = fixture()
+    detailSequence(pre, [auth, { ...auth, ...change }])
+    await expectRefusal(pre, "PRECONDITION_CHANGED")
+    const post = fixture()
+    detailSequence(post, [auth, auth, { ...auth, ...change }])
+    await expect(post.run()).rejects.toThrow("VERIFICATION_FAILED")
+    expect(post.user.updateMany).toHaveBeenCalledTimes(1)
+    expect(post.rows()).toEqual([profile])
+    expectNoAuthWrites(post)
+  })
+
+  it.each(["list", "detail"])("rejects restrictions exposed only by %s", async (endpoint) => {
+    for (const restriction of [
+      { banned_until: "9999-01-01T00:00:00Z" }, { deleted_at: "2026-01-01T00:00:00Z" },
+    ]) {
+      const f = fixture(endpoint === "list" ? { pages: [[{ ...auth, ...restriction }], []] } : {})
+      if (endpoint === "detail") detailSequence(f, [{ ...auth, ...restriction }])
+      await expectRefusal(f, "AUTH_RESTRICTED")
+    }
+  })
+
+  it.each([undefined, false, 0, "invalid", {}])("rejects malformed exposed restriction values (%s)", async (value) => {
+    const f = fixture()
+    detailSequence(f, [{ ...auth, banned_until: value }])
+    await expectRefusal(f, "AUTH_RESTRICTION_INVALID")
+  })
+
+  it("allows stable absent restriction fields without claiming unrestricted status", async () => {
+    const result = await fixture().run()
+    expect(result.noExposedAuthRestrictions).toBe(true)
+    expect(result).not.toHaveProperty("unrestricted")
+    expect(result).not.toHaveProperty("authUnchanged")
+  })
+
+  it("normalizes expired bans and empty deletion state without comparing timestamps", async () => {
+    const f = fixture()
+    detailSequence(f, [
+      { ...auth, banned_until: "2000-01-01T00:00:00Z", deleted_at: null },
+      { ...auth, banned_until: "2001-01-01T00:00:00Z", deleted_at: "" },
+      { ...auth, banned_until: null, deleted_at: null },
+    ])
+    await expect(f.run()).resolves.toMatchObject({ outcome: "PROMOTED" })
+  })
+
+  it.each(["list", "detail"])("rejects loss of previously exposed %s restriction state", async (endpoint) => {
+    const f = fixture()
+    const exposed = { ...auth, banned_until: null, deleted_at: null }
+    if (endpoint === "list") scanSequence(f, [[[exposed]], [[auth]]])
+    else detailSequence(f, [exposed, auth])
+    await expectRefusal(f, "PRECONDITION_CHANGED")
+  })
+
+  it.each(["missing", "duplicate", "replacement UUID"])("rejects a %s match at pre- and post-write scans", async (kind) => {
+    const replacement = { ...auth, id: "22222222-2222-4222-8222-222222222222" }
+    const changedPages = kind === "missing" ? [] :
+      kind === "duplicate" ? [[auth], [replacement]] : [[replacement]]
+    const pre = fixture()
+    scanSequence(pre, [[[auth]], changedPages])
+    await expectRefusal(pre, "PRECONDITION_CHANGED")
+    const post = fixture()
+    scanSequence(post, [[[auth]], [[auth]], changedPages])
+    await expect(post.run()).rejects.toThrow("VERIFICATION_FAILED")
+    expect(post.rows()).toEqual([profile])
+    expectNoAuthWrites(post)
+  })
+
+  it("compares changed UUIDs even when both Auth endpoints agree on the new UUID", async () => {
+    const f = fixture()
+    const changed = { ...auth, id: "22222222-2222-4222-8222-222222222222" }
+    scanSequence(f, [[[auth]], [[changed]]])
+    detailSequence(f, [auth, changed])
+    await expectRefusal(f, "PRECONDITION_CHANGED")
+  })
+
+  it("rejects an initially unconfirmed detailed response even if list is confirmed", async () => {
+    const f = fixture()
+    detailSequence(f, [{ ...auth, email_confirmed_at: null }])
+    await expectRefusal(f, "AUTH_UNCONFIRMED")
+  })
+
+  it.each([0, 1, 2])("fails closed on detailed lookup failure at check %s", async (check) => {
+    const f = fixture()
+    detailSequence(f, Array(check).fill(auth))
+    f.admin.getUserById.mockResolvedValueOnce({ data: null, error: new Error("private details") })
+    const code = ["AUTH_LOOKUP_FAILED", "PRECONDITION_CHANGED", "VERIFICATION_FAILED"][check]
+    if (check < 2) await expectRefusal(f, code)
+    else {
+      await expect(f.run()).rejects.toThrow(code)
+      expect(f.rows()).toEqual([profile])
+      expectNoAuthWrites(f)
+    }
   })
 
   it("never exposes provider errors or private fields in messages and reports", async () => {
