@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
+import { BrandLink } from "@/components/brand-link"
 import { usePathname } from "next/navigation"
 import { SignOutButton } from "@/components/sign-out-button"
 import { cn } from "@/lib/utils"
@@ -50,22 +50,10 @@ export function AppNav({ variant = "default" }: AppNavProps) {
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <Link href={variant === "admin" ? "/admin" : "/"} className="flex items-center gap-1.5">
-            <Image
-              src="/next.svg"
-              alt="Fresh Trace"
-              width={32}
-              height={32}
-              priority
-              style={{ height: "auto" }}
-            />
-            <span className="hidden text-sm font-semibold tracking-tight md:inline">
-              Fresh Trace
-            </span>
-          </Link>
+        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-4">
+          <BrandLink href={variant === "admin" ? "/admin" : "/"} />
 
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
             {navItems.map((item) => {
               const isActive = isNavActive(item.href)
 
@@ -73,6 +61,7 @@ export function AppNav({ variant = "default" }: AppNavProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     isActive
@@ -96,7 +85,7 @@ export function AppNav({ variant = "default" }: AppNavProps) {
       </header>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md lg:hidden"
         aria-label="Main navigation"
       >
         <div className="mx-auto flex h-16 max-w-lg items-center justify-around px-2">

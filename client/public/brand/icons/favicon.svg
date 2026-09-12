@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-labelledby="asset-title" >
+<title id="asset-title">FreshTrace leaf app icon</title>
+
+<rect id="background" width="1000" height="1000" rx="184" fill="#005F35"/><g id="favicon-leaf"><path id="leaf-body" d="M 797 201 C 800 385 773 541 657 652 C 565 739 438 784 301 783 C 319 738 351 679 394 621 C 451 544 528 458 687 323 C 525 424 415 520 339 625 C 305 672 277 720 264 771 C 209 699 205 603 232 521 C 283 362 441 255 797 201 Z" fill="#62D878"/><path id="leaf-vein" d="M 301 783 C 344 676 451 541 687 323 C 493 534 397 652 346 782 C 331 783 316 784 301 783 Z" fill="#EBFFF1"/></g>
+</svg>

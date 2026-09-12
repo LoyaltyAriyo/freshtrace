@@ -11,6 +11,8 @@ const ocrRuntimeFiles = [
 ];
 
 const nextConfig: NextConfig = {
+  // Keep local previews free of the Next.js badge; errors still surface normally.
+  devIndicators: false,
   // Ensure Turbopack treats the repo root (which contains node_modules/next)
   // as the filesystem root, even though the app lives in client/.
   turbopack: {

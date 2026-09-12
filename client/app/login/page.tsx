@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
+import { BrandLink } from "@/components/brand-link"
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong"
@@ -65,8 +66,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
+          <BrandLink className="mb-4" />
           <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in to your Fresh Trace account</p>
+          <p className="mt-1 text-sm text-muted-foreground">Sign in to your FreshTrace account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

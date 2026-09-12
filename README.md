@@ -429,3 +429,12 @@ The project required close collaboration between frontend and backend contributo
 ## License / Purpose
 
 This project was developed for educational, portfolio, and demonstration purposes.
+
+## Brand assets
+
+Approved runtime logos are in `client/public/brand/`, and favicon/application
+icons are in `client/public/brand/icons/`. Use the standard horizontal logo on
+light backgrounds and the `-dark` variant on dark backgrounds. Preserve the
+approved proportions and colours; do not stretch or recolour. Application icons
+use `purpose: any`, not maskable. See [brand usage and inventory](asset/brand/README.md)
+for preserved exports and delivery details.

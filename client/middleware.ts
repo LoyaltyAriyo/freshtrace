@@ -44,5 +44,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  // Public branding must load before login. Keep exclusions narrowly scoped so
+  // unrelated paths (including unknown pages) retain their existing auth gate.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|brand/|manifest\\.webmanifest$).*)"],
 }

@@ -1,0 +1,200 @@
+[
+  {
+    "path": "Logo&Favicon/README.md",
+    "type": "text/plain",
+    "bytes": 11809,
+    "sha256": "ac2599fa1d7184331945b6acc0749011b39ac8654582c8244e446ae06d66f350",
+    "final_path": "asset/brand/package-readme.md"
+  },
+  {
+    "path": "Logo&Favicon/apple-touch-icon.png",
+    "type": "image/png",
+    "bytes": 5424,
+    "sha256": "104cf10854692ce4cabb5faf48e279077d94a5c4b9c74f0ebd05213fff2d312b",
+    "dimensions": [
+      180,
+      180
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      255,
+      255
+    ],
+    "final_path": "client/public/brand/icons/apple-touch-icon.png"
+  },
+  {
+    "path": "Logo&Favicon/favicon-16x16.png",
+    "type": "image/png",
+    "bytes": 510,
+    "sha256": "6e30474ece123778a115a597b741e186516227d5e86c97bc6bb568e568694fe1",
+    "dimensions": [
+      16,
+      16
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      8,
+      255
+    ],
+    "final_path": "client/public/brand/icons/favicon-16x16.png"
+  },
+  {
+    "path": "Logo&Favicon/favicon-32x32.png",
+    "type": "image/png",
+    "bytes": 1040,
+    "sha256": "21eb9bf6c820dd8f0d7c411d4f0d37956e4ad5cb2e85afcd7f2b35d2c23bfa09",
+    "dimensions": [
+      32,
+      32
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "final_path": "client/public/brand/icons/favicon-32x32.png"
+  },
+  {
+    "path": "Logo&Favicon/favicon.svg",
+    "type": "image/svg+xml",
+    "bytes": 703,
+    "sha256": "3b09656dbc605291c3c1479838b11be79c86be4a4a8c5ffa76cbc868934d9391",
+    "viewBox": "0 0 1000 1000",
+    "ids": 5,
+    "security_issues": [],
+    "transparency": "transparent rounded outer corners",
+    "final_path": "client/public/brand/icons/favicon.svg"
+  },
+  {
+    "path": "Logo&Favicon/freshtrace-logo-horizontal-2048.png",
+    "type": "image/png",
+    "bytes": 67193,
+    "sha256": "ce0a978cc64ca40430b5c4af5418d13ec5f55a65d370374f75c1c0dd89f53638",
+    "dimensions": [
+      2048,
+      478
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "final_path": "asset/brand/freshtrace-logo-horizontal-2048.png"
+  },
+  {
+    "path": "Logo&Favicon/freshtrace-logo-horizontal-dark.svg",
+    "type": "image/svg+xml",
+    "bytes": 10389,
+    "sha256": "e15499bf515a64c153f6c571c9cd9a056b252cc1ba1cb254e29b5c52c7965625",
+    "viewBox": "0 0 1028.8 240",
+    "ids": 37,
+    "security_issues": [],
+    "transparency": "transparent background (no full-canvas fill)",
+    "final_path": "client/public/brand/freshtrace-logo-horizontal-dark.svg"
+  },
+  {
+    "path": "Logo&Favicon/freshtrace-logo-horizontal.svg",
+    "type": "image/svg+xml",
+    "bytes": 10368,
+    "sha256": "b0fb37e168ba91135c6c48dabf2a38e9433769240a6779bbbb5ba13d9c80978b",
+    "viewBox": "0 0 1028.8 240",
+    "ids": 37,
+    "security_issues": [],
+    "transparency": "transparent background (no full-canvas fill)",
+    "final_path": "client/public/brand/freshtrace-logo-horizontal.svg"
+  },
+  {
+    "path": "Logo&Favicon/freshtrace-logo-mark-1024.png",
+    "type": "image/png",
+    "bytes": 91426,
+    "sha256": "32853fb7757aa3a5ee816bafcf6f0907eb3f2d95d0d66b15fe1567db70698a9d",
+    "dimensions": [
+      1024,
+      1024
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "final_path": "asset/brand/freshtrace-logo-mark-1024.png"
+  },
+  {
+    "path": "Logo&Favicon/freshtrace-logo-mark-flat.svg",
+    "type": "image/svg+xml",
+    "bytes": 2619,
+    "sha256": "03c3e86a5ed04710445d64293ddc9fa8f1be5c131273c08faf763324c0521830",
+    "viewBox": "125 110 1000 1000",
+    "ids": 18,
+    "security_issues": [],
+    "transparency": "transparent background (no full-canvas fill)",
+    "final_path": "client/public/brand/freshtrace-logo-mark-flat.svg"
+  },
+  {
+    "path": "Logo&Favicon/freshtrace-logo-mark-monochrome.svg",
+    "type": "image/svg+xml",
+    "bytes": 1472,
+    "sha256": "5f183deca563e0f36c68723d0135132f94d174edb52da1f49bede31ffc28a2bb",
+    "viewBox": "125 110 1000 1000",
+    "ids": 7,
+    "security_issues": [],
+    "transparency": "transparent background (no full-canvas fill)",
+    "final_path": "client/public/brand/freshtrace-logo-mark-monochrome.svg"
+  },
+  {
+    "path": "Logo&Favicon/freshtrace-logo-mark.svg",
+    "type": "image/svg+xml",
+    "bytes": 4074,
+    "sha256": "77fad6306d082997a3913f5457e2578b82ebe26d73c1213d4b4de6f2c67144bc",
+    "viewBox": "125 110 1000 1000",
+    "ids": 25,
+    "security_issues": [],
+    "transparency": "transparent background (no full-canvas fill)",
+    "final_path": "client/public/brand/freshtrace-logo-mark.svg"
+  },
+  {
+    "path": "Logo&Favicon/icon-192.png",
+    "type": "image/png",
+    "bytes": 7063,
+    "sha256": "d7db639d9d9fe3322d08c00270079e4ae70145a13a5c7dfefb7fc1155e838f0f",
+    "dimensions": [
+      192,
+      192
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "final_path": "client/public/brand/icons/icon-192.png"
+  },
+  {
+    "path": "Logo&Favicon/icon-512.png",
+    "type": "image/png",
+    "bytes": 21322,
+    "sha256": "60182193bc86100d1c0162de80fc390242b4677433172599b286fdfbb693f6c7",
+    "dimensions": [
+      512,
+      512
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "final_path": "client/public/brand/icons/icon-512.png"
+  },
+  {
+    "path": "Logo&Favicon/reference-comparison.png",
+    "type": "image/png",
+    "bytes": 632108,
+    "sha256": "fd2fb4312312958036645d23cf389a488e2ec2a32b3e0c5a1dd32a6b1f3ae967",
+    "dimensions": [
+      1280,
+      1410
+    ],
+    "mode": "RGB",
+    "alpha_extrema": null,
+    "final_path": "asset/brand/reference-comparison.png"
+  }
+]

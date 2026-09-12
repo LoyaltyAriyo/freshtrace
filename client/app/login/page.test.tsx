@@ -8,6 +8,13 @@ beforeEach(() => push.mockReset())
 afterEach(() => vi.unstubAllGlobals())
 
 describe("login role navigation", () => {
+  it("provides the approved FreshTrace home link without duplicating its accessible name", () => {
+    render(<LoginPage />)
+    const home = screen.getByRole("link", { name: "FreshTrace home" })
+    expect(home).toHaveAttribute("href", "/")
+    expect(home.querySelector("img")).toHaveAttribute("src", "/brand/freshtrace-logo-horizontal.svg")
+    expect(home.querySelector("img")).toHaveAttribute("alt", "")
+  })
   it.each([["ADMIN", "/admin"], ["USER", "/"], [null, "/"]])(
     "routes %s to %s using only safe user JSON", async (role, destination) => {
       const fetchMock = vi.fn().mockResolvedValue(Response.json({

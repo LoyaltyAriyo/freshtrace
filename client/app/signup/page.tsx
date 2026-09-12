@@ -117,7 +117,7 @@ export default function SignupPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Start tracking your food with Fresh Trace</p>
+          <p className="mt-1 text-sm text-muted-foreground">Start tracking your food with FreshTrace</p>
         </div>
 
         <form onSubmit={handleSubmit} aria-label="Create an account" aria-busy={loading} className="flex flex-col gap-4">

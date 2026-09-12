@@ -4,29 +4,33 @@ import "./globals.css"
 import { ConditionalNav } from "@/components/conditional-nav"
 
 export const metadata: Metadata = {
-  title: "Fresh Trace",
+  title: "FreshTrace",
+  applicationName: "FreshTrace",
   description: "Food tracking and waste reduction application",
   icons: {
     icon: [
       {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
+        url: "/brand/icons/favicon-32x32.png",
+        sizes: "32x32",
+        type: "image/png",
       },
       {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
+        url: "/brand/icons/favicon-16x16.png",
+        sizes: "16x16",
+        type: "image/png",
       },
       {
-        url: "/icon.svg",
+        url: "/brand/icons/favicon.svg",
+        sizes: "any",
         type: "image/svg+xml",
       },
     ],
-    apple: "/apple-icon.png",
+    apple: [{ url: "/brand/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: "#3a9a5c",
+  themeColor: "#005F35",
   width: "device-width",
   initialScale: 1,
 }
@@ -41,7 +45,7 @@ export default function RootLayout({
       <body suppressHydrationWarning className="font-sans antialiased">
         <div className="min-h-screen bg-background">
           <ConditionalNav />
-          <main className="mx-auto max-w-6xl px-4 py-6 pb-24 md:pb-6">{children}</main>
+          <main className="mx-auto max-w-6xl px-4 py-6 pb-24 lg:pb-6">{children}</main>
         </div>
         <Toaster position="top-center" richColors />
       </body>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="125 110 1000 1000" role="img" aria-labelledby="asset-title" color="#005F35">
+<title id="asset-title">FreshTrace three-leaf monochrome mark</title>
+
+<g id="leaf-top"><path id="leaf-top-silhouette" fill="currentColor" fill-rule="evenodd" d="M 260 385 C 342 246 499 152 655 152 C 825 149 967 219 1014 346 C 1043 423 1033 509 989 587 Q 986 593 982 583 C 968 552 942 546 894 538 C 813 524 761 486 728 424 C 684 340 621 299 523 291 C 423 282 339 326 266 390 Q 255 397 260 385 Z M 385 283 C 461 237 548 225 621 234 C 533 231 457 251 385 283 Z"/></g>
+<g id="leaf-left"><path id="leaf-left-silhouette" fill="currentColor" fill-rule="evenodd" d="M 325 420 Q 332 414 333 425 C 337 480 370 518 399 571 C 442 648 448 702 425 775 C 400 853 391 911 433 972 C 456 1005 483 1036 514 1062 Q 523 1070 512 1069 C 345 1045 223 940 174 810 C 132 699 153 603 200 539 C 232 495 284 453 325 420 Z M 281 526 C 258 674 301 820 385 954 C 286 840 242 688 281 526 Z"/></g>
+<g id="leaf-bottom-right"><path id="leaf-bottom-right-silhouette" fill="currentColor" fill-rule="evenodd" d="M 1060 608 C 1064 591 1074 574 1080 582 C 1118 686 1096 800 1034 888 C 957 1003 850 1068 741 1067 C 656 1069 584 1039 533 985 Q 527 978 537 977 C 559 974 577 963 590 943 C 650 849 713 799 814 791 C 905 786 958 770 1007 719 C 1034 690 1054 652 1060 608 Z M 613 976 C 712 963 792 932 874 885 C 777 952 705 983 613 976 Z"/></g>
+</svg>
