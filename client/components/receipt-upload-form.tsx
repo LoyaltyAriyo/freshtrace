@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import { cn } from "@/lib/utils"
+import { MAX_RECEIPT_FILE_BYTES, RECEIPT_IMAGE_TYPES, RECEIPT_SIZE_ERROR, RECEIPT_TYPE_ERROR } from "@/lib/receipt-upload"
 
 type UploadState = "idle" | "uploading" | "error"
 
@@ -207,15 +208,15 @@ export function ReceiptUploadForm() {
   async function handleFile(file: File | undefined) {
     if (!file) return
 
-    if (!file.type.startsWith("image/")) {
+    if (!RECEIPT_IMAGE_TYPES.has(file.type)) {
       setState("error")
-      setErrorMsg("Invalid file type. Please upload an image (JPG, PNG, HEIC).")
+      setErrorMsg(RECEIPT_TYPE_ERROR)
       return
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > MAX_RECEIPT_FILE_BYTES) {
       setState("error")
-      setErrorMsg("File is too large. Maximum size is 10MB.")
+      setErrorMsg(RECEIPT_SIZE_ERROR)
       return
     }
 
@@ -240,6 +241,7 @@ export function ReceiptUploadForm() {
       setUploadStep("Saving results...")
 
       if (!response.ok) {
+        if (response.status === 413) throw new Error(RECEIPT_SIZE_ERROR)
         const data = await response.json().catch(() => null)
         throw new Error(data?.error || "Upload failed")
       }
@@ -439,7 +441,7 @@ export function ReceiptUploadForm() {
       >
         <Upload className="h-8 w-8 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">Drag and drop a receipt image here</p>
-        <p className="text-xs text-muted-foreground">Supports JPG, PNG, HEIC up to 10MB</p>
+        <p className="text-xs text-muted-foreground">Supports JPG, PNG, HEIC, HEIF, and WebP up to 4 MiB</p>
       </div>
 
       {state === "uploading" && (

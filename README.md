@@ -221,6 +221,11 @@ TESSERACT_ENABLED="true"
 
 For production receipt scanning on Vercel, add `TESSERACT_ENABLED=true` in the
 project's Environment Variables for the desired environments, then redeploy.
+Receipt images are limited to 4 MiB in both the browser and API to leave room
+for multipart overhead under Vercel's 4.5 MB request limit. Larger images must
+be resized before upload. JPG, PNG, HEIC, HEIF, and WebP uploads are accepted;
+OCR may still fail for a format unsupported by the image decoder, in which
+case users can review and add items manually.
 With Root Directory set to `client`, the production build traces the tracked
 English language data and the Tesseract Node worker into only the receipt API
 function. OCR never downloads language data during a request.
@@ -319,8 +324,10 @@ Missing or incorrect authorization returns 401; missing/short `CRON_SECRET`,
 invalid database configuration, or a database failure returns 503. Only database
 operation failures produce a fixed console message. Prisma's automatic raw
 error logging is disabled; existing application-level logging remains in place.
-The existing middleware excludes API routes, so this endpoint does not require
-a user session and returns directly without a login redirect.
+The session proxy excludes this cron endpoint, so it does not require a user
+session and returns directly without a login redirect. Other inventory/admin
+APIs pass through the proxy for session refresh, then enforce authorization in
+their own route handlers and return JSON errors rather than login redirects.
 
 After a production deployment, inspect **Project Settings → Cron Jobs** for the
 registered schedule and execution history, and the project's runtime **Logs**

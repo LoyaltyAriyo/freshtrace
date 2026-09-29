@@ -20,6 +20,7 @@ describe("ReceiptUploadForm", () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it("shows an error for non-image files", async () => {
@@ -33,18 +34,20 @@ describe("ReceiptUploadForm", () => {
 
     expect(
       await screen.findByText(
-        "Invalid file type. Please upload an image (JPG, PNG, HEIC)."
+        "Invalid file type. Please upload a JPG, PNG, HEIC, HEIF, or WebP image."
       )
     ).toBeInTheDocument()
   })
 
-  it("shows an error for files larger than 10MB", async () => {
+  it("shows an error for files larger than 4 MiB", async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
     render(<ReceiptUploadForm />)
 
     const input = screen.getByLabelText("Upload receipt image") as HTMLInputElement
 
     const bigFile = new File(
-      [new Uint8Array(10 * 1024 * 1024 + 1)],
+      [new Uint8Array(4 * 1024 * 1024 + 1)],
       "big.jpg",
       { type: "image/jpeg" }
     )
@@ -52,8 +55,19 @@ describe("ReceiptUploadForm", () => {
     await fireEvent.change(input, { target: { files: [bigFile] } })
 
     expect(
-      await screen.findByText("File is too large. Maximum size is 10MB.")
+      await screen.findByText("File is too large. Maximum size is 4 MiB. Please choose a smaller image.")
     ).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("explains a platform 413 even when the response is not JSON", async () => {
+    const json = vi.fn().mockRejectedValue(new Error("Not JSON"))
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 413, json }))
+    render(<ReceiptUploadForm />)
+    fireEvent.change(screen.getByLabelText("Upload receipt image"), { target: { files: [new File(["data"], "receipt.webp", { type: "image/webp" })] } })
+    expect(await screen.findByText("File is too large. Maximum size is 4 MiB. Please choose a smaller image.")).toBeInTheDocument()
+    expect(json).not.toHaveBeenCalled()
+    expect(pushMock).not.toHaveBeenCalled()
   })
 
   it("submits a valid image file, calls /api/receipts, and navigates on success", async () => {
@@ -117,4 +131,3 @@ describe("ReceiptUploadForm", () => {
     ).toBeInTheDocument()
   })
 })
-

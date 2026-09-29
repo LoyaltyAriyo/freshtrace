@@ -138,10 +138,10 @@ describe("POST /api/receipts route", () => {
     expect(body.error).toMatch(/Invalid file type/i)
   })
 
-  it("returns 400 for oversized file", async () => {
+  it("returns 413 for oversized file", async () => {
     const formData = new FormData()
     const bigFile = new File(
-      [new Uint8Array(10 * 1024 * 1024 + 1)],
+      [new Uint8Array(4 * 1024 * 1024 + 1)],
       "big.jpg",
       { type: "image/jpeg" }
     )
@@ -151,12 +151,14 @@ describe("POST /api/receipts route", () => {
 
     const response = await POST(request)
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(413)
     const body = await response.json()
     expect(body.error).toMatch(/File is too large/i)
+    expect(uploadMock).not.toHaveBeenCalled()
+    expect(createReceiptMock).not.toHaveBeenCalled()
   })
 
-  it("returns success JSON with receiptId for a valid upload", async () => {
+  it.each([4, 4 * 1024 * 1024])("accepts a valid upload of %i bytes, including the exact limit", async (size) => {
     uploadMock.mockResolvedValue({ error: null })
     downloadMock.mockResolvedValue({
       data: new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }),
@@ -178,7 +180,7 @@ describe("POST /api/receipts route", () => {
     const formData = new FormData()
     formData.append(
       "receipt",
-      new File(["data"], "receipt.jpg", { type: "image/jpeg" })
+      new File([new Uint8Array(size)], "receipt.jpg", { type: "image/jpeg" })
     )
 
     const request = makeTestRequest(formData)

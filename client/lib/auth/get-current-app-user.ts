@@ -14,10 +14,9 @@ export async function getCurrentAppUser() {
         getAll() {
           return cookieStore.getAll()
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
+        setAll() {
+          // Server Components cannot write cookies. Proxy refreshes the session
+          // and forwards its cookies before this component is rendered.
         },
       },
     },

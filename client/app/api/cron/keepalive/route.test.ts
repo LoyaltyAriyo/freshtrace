@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server"
-import { config as middlewareConfig } from "@/middleware"
+import { config as proxyConfig } from "@/proxy"
 import vercelConfig from "@/vercel.json"
 import { GET, dynamic, runtime } from "./route"
 
@@ -172,10 +172,10 @@ describe("production routing and schedule", () => {
 
   it.each([null, `Bearer ${secret}`])("reaches the endpoint directly without session middleware %#", async (header) => {
     const req = request(header)
-    expect(unstable_doesMiddlewareMatch({ config: middlewareConfig, nextConfig: {}, url: req.url })).toBe(false)
+    expect(unstable_doesMiddlewareMatch({ config: proxyConfig, nextConfig: {}, url: req.url })).toBe(false)
     // Execute the selected handler with the production-mode request and no cookies.
     await expectResponse(await GET(req), header ? 200 : 401)
     expect(sessionAccess).not.toHaveBeenCalled()
-    expect(unstable_doesMiddlewareMatch({ config: middlewareConfig, nextConfig: {}, url: "/inventory" })).toBe(true)
+    expect(unstable_doesMiddlewareMatch({ config: proxyConfig, nextConfig: {}, url: "/inventory" })).toBe(true)
   })
 })

@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { NextResponse } from "next/server"
+
+vi.mock("@/lib/auth/require-admin", () => ({ requireAdmin: vi.fn() }))
 
 vi.mock("@/lib/prisma", () => {
   const userCount = vi.fn()
@@ -27,6 +30,7 @@ vi.mock("@/lib/prisma", () => {
 })
 
 import { GET } from "./route"
+import { requireAdmin } from "@/lib/auth/require-admin"
 // @ts-expect-error - test-only mocked exports
 import { userCount, receiptCount, foodItemCount, wastedItemCount, usedItemCount, categoryFindMany } from "@/lib/prisma"
 
@@ -55,6 +59,7 @@ function setupMocks(overrides: Partial<{
 
 describe("GET /api/analytics", () => {
   beforeEach(() => {
+    vi.mocked(requireAdmin).mockResolvedValue({ ok: true })
     vi.setSystemTime(FIXED_NOW)
     setupMocks()
   })
@@ -64,12 +69,22 @@ describe("GET /api/analytics", () => {
     vi.resetAllMocks()
   })
 
+  it.each([401, 403])("blocks unauthorized analytics access with %i before querying data", async (status) => {
+    vi.mocked(requireAdmin).mockResolvedValue({ ok: false, response: NextResponse.json({ error: "Denied" }, { status }) })
+    const response = await GET(new Request("http://localhost/api/analytics"))
+    expect(response.status).toBe(status)
+    for (const query of [userCount, receiptCount, foodItemCount, wastedItemCount, usedItemCount, categoryFindMany]) {
+      expect(query).not.toHaveBeenCalled()
+    }
+  })
+
   it("returns 200 with analytics data for default range (7d)", async () => {
     const request = new Request("http://localhost/api/analytics")
     const response = await GET(request)
     const body = await response.json()
 
     expect(response.status).toBe(200)
+    expect(response.headers.get("cache-control")).toBe("private, no-store")
     expect(body.range).toBe("7d")
     expect(body.activeUsers).toBe(10)
     expect(body.totalReceipts).toBe(5)

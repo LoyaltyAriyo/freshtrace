@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { logError } from "@/lib/logger"
+import { requireAdmin } from "@/lib/auth/require-admin"
 
 function getDateFrom(range: string): Date | null {
   const now = new Date()
@@ -23,6 +24,9 @@ function getDateFrom(range: string): Date | null {
 
 export async function GET(request: Request) {
   try {
+    const auth = await requireAdmin()
+    if (!auth.ok) return auth.response
+
     const { searchParams } = new URL(request.url)
     const range = searchParams.get("range") ?? "7d"
     const dateFrom = getDateFrom(range)
@@ -85,7 +89,7 @@ export async function GET(request: Request) {
       wastedItems,
       usedItems,
       topCategories: topCategoriesFormatted,
-    })
+    }, { headers: { "Cache-Control": "private, no-store" } })
   } catch (error) {
     await logError({
       message: "Failed to fetch analytics.",

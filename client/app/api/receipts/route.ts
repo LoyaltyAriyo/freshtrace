@@ -9,9 +9,9 @@ import {
 import { supabaseAdmin } from "@/lib/supabase/server"
 import { getCurrentUserId } from "@/lib/auth"
 import { logError } from "@/lib/logger"
+import { MAX_RECEIPT_FILE_BYTES, RECEIPT_IMAGE_TYPES, RECEIPT_SIZE_ERROR, RECEIPT_TYPE_ERROR } from "@/lib/receipt-upload"
 
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 const RECEIPTS_BUCKET = "receipts"
 
 type PersistedOcrStatus = "PENDING" | "SUCCESS" | "FAILED" | "FALLBACK_USED"
@@ -29,14 +29,6 @@ function getPersistedOcrStatus(outcome: OcrOutcomeStatus): PersistedOcrStatus {
       return "FAILED"
   }
 }
-
-const ALLOWED_IMAGE_MIME_TYPES = new Set<string>([
-  "image/jpeg",
-  "image/png",
-  "image/heic",
-  "image/heif",
-  "image/webp",
-])
 
 function buildReceiptObjectPath(file: File) {
   const timestamp = Date.now()
@@ -95,17 +87,17 @@ export async function POST(request: Request) {
     }
 
     const file = entry as File
-    if (!file.type || !ALLOWED_IMAGE_MIME_TYPES.has(file.type)) {
+    if (!RECEIPT_IMAGE_TYPES.has(file.type)) {
       return Response.json(
-        { error: "Invalid file type. Please upload a JPG, PNG, HEIC, or WebP image." },
+        { error: RECEIPT_TYPE_ERROR },
         { status: 400 }
       )
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+    if (file.size > MAX_RECEIPT_FILE_BYTES) {
       return Response.json(
-        { error: "File is too large. Maximum size is 10MB." },
-        { status: 400 }
+        { error: RECEIPT_SIZE_ERROR },
+        { status: 413 }
       )
     }
 

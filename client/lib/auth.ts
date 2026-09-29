@@ -8,7 +8,8 @@ import { logError } from "@/lib/logger"
  *
  * This helper is intentionally minimal:
  * - It reads cookies from the incoming Request header.
- * - It does not attempt to write or refresh cookies (setAll is a no-op).
+ * - Proxy refreshes and forwards session cookies before these APIs run.
+ * - This read-only client verifies the forwarded session with Supabase.
  * - It returns null when the user cannot be resolved instead of throwing.
  */
 export async function getCurrentUserId(request: Request): Promise<string | null> {
@@ -26,7 +27,7 @@ export async function getCurrentUserId(request: Request): Promise<string | null>
             value: String(value),
           }))
         },
-        // Inventory APIs do not need to modify auth cookies; treat setAll as a no-op.
+        // Proxy owns refresh cookies on both the request and response.
         setAll() {
           // no-op
         },
