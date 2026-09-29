@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { navigateAfterLogin } from "@/lib/auth/navigate-after-login"
 import { AuthField, AuthShell } from "@/components/auth/auth-shell"
 import { Button } from "@/components/ui/button"
 import styles from "@/components/auth/auth.module.css"
@@ -97,11 +98,7 @@ export default function SignupPage() {
 
       const role = loginData?.user?.role
 
-      if (role === "ADMIN") {
-        router.push("/admin")
-      } else {
-        router.push("/")
-      }
+      navigateAfterLogin(role)
     } catch {
       if (accountCreated.current) setSuccess("Account created. Please sign in to continue.")
       setError("Unable to complete the request. Please try again or sign in if your account was created.")

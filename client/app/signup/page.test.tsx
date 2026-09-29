@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import SignupPage from "./page"
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }))
+const { navigateAfterLogin } = vi.hoisted(() => ({ navigateAfterLogin: vi.fn() }))
+vi.mock("@/lib/auth/navigate-after-login", () => ({ navigateAfterLogin }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }))
 const fetchMock = vi.fn()
 function response(data: unknown, status = 200) { return Response.json(data, { status }) }
@@ -16,6 +18,7 @@ function submit() { fireEvent.submit(screen.getByRole("form", { name: "Create an
 beforeEach(() => {
   fetchMock.mockReset()
   push.mockReset()
+  navigateAfterLogin.mockReset()
   vi.stubGlobal("fetch", fetchMock)
 })
 afterEach(() => vi.unstubAllGlobals())
@@ -30,6 +33,7 @@ describe("signup confirmation and login", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchMock.mock.calls[0][0]).toBe("/api/auth/signup")
     expect(push).not.toHaveBeenCalled()
+    expect(navigateAfterLogin).not.toHaveBeenCalled()
     expect(screen.getByRole("button", { name: "Sign Up" })).toBeDisabled()
     expect(screen.getByLabelText("Password")).toHaveValue("")
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login")
@@ -38,14 +42,15 @@ describe("signup confirmation and login", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(screen.getByRole("status")).toBeVisible()
   })
-  it.each([["ADMIN", "/admin"], ["USER", "/"], [null, "/"]])(
-    "automatically logs in and routes %s to %s without a JSON access token", async (role, destination) => {
+  it.each(["ADMIN", "USER", null])(
+    "automatically logs in and navigates for %s without a JSON access token", async (role) => {
       fetchMock.mockResolvedValueOnce(response({ confirmationRequired: false }, 201))
         .mockResolvedValueOnce(response({ user: { id: "fake-id", email: "test@example.com", role } }))
       render(<SignupPage />)
       fill()
       submit()
-      await waitFor(() => expect(push).toHaveBeenCalledExactlyOnceWith(destination))
+      await waitFor(() => expect(navigateAfterLogin).toHaveBeenCalledExactlyOnceWith(role))
+      expect(push).not.toHaveBeenCalled()
       expect(fetchMock).toHaveBeenCalledTimes(2)
       expect(fetchMock.mock.calls[1][0]).toBe("/api/auth/login")
       expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ email: "test@example.com", password: "fake-password" })
@@ -108,6 +113,7 @@ describe("signup confirmation and login", () => {
     fill()
     submit()
     await waitFor(() => expect(push).toHaveBeenCalledWith("/login"))
+    expect(navigateAfterLogin).not.toHaveBeenCalled()
     expect(screen.getByRole("status")).toHaveTextContent("Please sign in")
     submit()
     expect(fetchMock).toHaveBeenCalledTimes(2)

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { navigateAfterLogin } from "@/lib/auth/navigate-after-login"
 import { AuthField, AuthShell } from "@/components/auth/auth-shell"
 import { Button } from "@/components/ui/button"
 import styles from "@/components/auth/auth.module.css"
@@ -11,7 +11,6 @@ function getErrorMessage(error: unknown) {
 }
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -49,11 +48,7 @@ export default function LoginPage() {
 
       const role = data?.user?.role
 
-      if (role === "ADMIN") {
-        router.push("/admin")
-      } else {
-        router.push("/")
-      }
+      navigateAfterLogin(role)
     } catch (error: unknown) {
       setError(getErrorMessage(error))
     } finally {
