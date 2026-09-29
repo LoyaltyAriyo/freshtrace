@@ -45,7 +45,7 @@ export default function RootLayout({
       <body suppressHydrationWarning className="font-sans antialiased">
         <div className="min-h-screen bg-background">
           <ConditionalNav />
-          <main className="mx-auto max-w-6xl px-4 py-6 pb-24 lg:pb-6">{children}</main>
+          <main className="mx-auto max-w-6xl px-4 py-6 pb-24 lg:pb-6 has-[[data-auth-page]]:max-w-none has-[[data-auth-page]]:p-0">{children}</main>
         </div>
         <Toaster position="top-center" richColors />
       </body>

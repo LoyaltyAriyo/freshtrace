@@ -12,20 +12,20 @@ vi.mock("next/navigation", () => ({
 beforeEach(() => { route.pathname = "/" })
 
 describe("FreshTrace navigation", () => {
-  it("uses one accessible home link and the approved horizontal SVG at its exact ratio", () => {
+  it("uses one accessible home link with a compact mark and wordmark", () => {
     render(<AppNav />)
     const link = screen.getByRole("link", { name: "FreshTrace home" })
     expect(link).toHaveAttribute("href", "/")
-    expect(link).toHaveClass("min-h-20", "shrink-0")
+    expect(link).toHaveClass("min-h-11", "shrink-0")
     const image = link.querySelector("img")!
-    expect(image).toHaveAttribute("src", "/brand/freshtrace-logo-horizontal.svg")
+    expect(image).toHaveAttribute("src", "/brand/freshtrace-logo-mark-monochrome.svg")
     expect(image).toHaveAttribute("alt", "")
-    expect(Number(image.width) / Number(image.height)).toBeCloseTo(1028.8 / 240, 10)
-    expect(image).toHaveClass("w-64", "h-auto")
+    expect(image.width).toBe(28)
+    expect(image.height).toBe(28)
     expect(image).toHaveAttribute("loading", "eager")
     expect(image).not.toHaveAttribute("srcset")
     expect(link.querySelectorAll("img")).toHaveLength(1)
-    expect(link.textContent).toBe("")
+    expect(link.textContent).toBe("FreshTrace")
   })
 
   it("keeps the full logo on mobile and uses bottom navigation through tablet widths", () => {
@@ -58,13 +58,13 @@ describe("FreshTrace navigation", () => {
     expect(screen.getByRole("button", { name: /sign out/i })).toBeInTheDocument()
   })
 
-  it.each(["/login", "/admin", "/admin/analytics"])("avoids duplicate shared headers on %s", (pathname) => {
+  it.each(["/login", "/signup", "/admin", "/admin/analytics"])("avoids duplicate shared headers on %s", (pathname) => {
     route.pathname = pathname
     const { container } = render(<ConditionalNav />)
     expect(container).toBeEmptyDOMElement()
   })
 
-  it.each(["/signup", "/", "/food-list", "/scan", "/account", "/missing-page"])("preserves the shared header on %s", (pathname) => {
+  it.each(["/", "/food-list", "/scan", "/account", "/missing-page"])("preserves the shared header on %s", (pathname) => {
     route.pathname = pathname
     render(<ConditionalNav />)
     expect(screen.getByRole("link", { name: "FreshTrace home" })).toBeInTheDocument()

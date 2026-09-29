@@ -50,7 +50,7 @@ export function AppNav({ variant = "default" }: AppNavProps) {
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-4">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
           <BrandLink href={variant === "admin" ? "/admin" : "/"} />
 
           <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">

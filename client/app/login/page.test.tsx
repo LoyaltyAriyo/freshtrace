@@ -12,7 +12,7 @@ describe("login role navigation", () => {
     render(<LoginPage />)
     const home = screen.getByRole("link", { name: "FreshTrace home" })
     expect(home).toHaveAttribute("href", "/")
-    expect(home.querySelector("img")).toHaveAttribute("src", "/brand/freshtrace-logo-horizontal.svg")
+    expect(home.querySelector("img")).toHaveAttribute("src", "/brand/freshtrace-logo-mark-monochrome.svg")
     expect(home.querySelector("img")).toHaveAttribute("alt", "")
   })
   it.each([["ADMIN", "/admin"], ["USER", "/"], [null, "/"]])(

@@ -1,0 +1,15 @@
+@font-face {
+  font-family: "FreshTrace Poppins";
+  src: url("/brand/auth/poppins-medium.ttf") format("truetype");
+  font-weight: 400 500;
+  font-display: swap;
+}
+
+.brand {
+  color: #005f35;
+  font-family: "FreshTrace Poppins", var(--font-sans);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.6px;
+}
