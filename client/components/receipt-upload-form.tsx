@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import { cn } from "@/lib/utils"
+import { receiptRequest, RECEIPT_UNCERTAIN_ERROR } from "@/lib/receipt-request"
 import { MAX_RECEIPT_FILE_BYTES, RECEIPT_IMAGE_TYPES, RECEIPT_SIZE_ERROR, RECEIPT_TYPE_ERROR } from "@/lib/receipt-upload"
 
 type UploadState = "idle" | "uploading" | "error"
@@ -17,6 +18,9 @@ export function ReceiptUploadForm() {
   const [progress, setProgress] = useState(0)
   const [uploadStep, setUploadStep] = useState("Uploading image...")
   const [errorMsg, setErrorMsg] = useState("")
+  const [recoveryId, setRecoveryId] = useState<string | null>(null)
+  const requestRef = useRef<AbortController | null>(null)
+  const generationRef = useRef(0)
   const [dragActive, setDragActive] = useState(false)
   const [isWebcamActive, setIsWebcamActive] = useState(false)
   const [capturedImage, setCapturedImage] = useState<{ blob: Blob; url: string } | null>(null)
@@ -56,6 +60,8 @@ export function ReceiptUploadForm() {
     }
 
     return () => {
+      generationRef.current += 1
+      requestRef.current?.abort()
       stopWebcam()
       if (capturedImage?.url) {
         URL.revokeObjectURL(capturedImage.url)
@@ -206,7 +212,7 @@ export function ReceiptUploadForm() {
   }
 
   async function handleFile(file: File | undefined) {
-    if (!file) return
+    if (!file || requestRef.current) return
 
     if (!RECEIPT_IMAGE_TYPES.has(file.type)) {
       setState("error")
@@ -220,44 +226,60 @@ export function ReceiptUploadForm() {
       return
     }
 
+    const controller = new AbortController()
+    requestRef.current = controller // Synchronous guard also covers drop/input events.
+    const generation = ++generationRef.current
+    const requestId = crypto.randomUUID()
+    setRecoveryId(requestId)
     setState("uploading")
     setProgress(25)
-    setUploadStep("Uploading image...")
+    setUploadStep("Uploading and processing receipt...")
     setErrorMsg("")
 
     try {
       const formData = new FormData()
       formData.append("receipt", file)
-
-      setProgress(50)
-      setUploadStep("Extracting items with OCR...")
-
-      const response = await fetch("/api/receipts", {
+      const data = await receiptRequest("/api/receipts", {
         method: "POST",
+        headers: { "x-receipt-request-id": requestId },
         body: formData,
-      })
-
-      setProgress(80)
-      setUploadStep("Saving results...")
-
-      if (!response.ok) {
-        if (response.status === 413) throw new Error(RECEIPT_SIZE_ERROR)
-        const data = await response.json().catch(() => null)
-        throw new Error(data?.error || "Upload failed")
-      }
-
-      const data = await response.json()
-
+      }, controller)
+      if (generation !== generationRef.current) return
+      if (!data.receiptId) throw new Error(RECEIPT_UNCERTAIN_ERROR)
       setProgress(100)
-      setUploadStep("Done!")
-
-      setTimeout(() => {
-        router.push(`/scan/review?receiptId=${data.receiptId}`)
-      }, 300)
+      setUploadStep("Receipt saved")
+      router.push(`/scan/review?receiptId=${encodeURIComponent(data.receiptId)}`)
     } catch (error) {
+      if (generation !== generationRef.current) return
       setState("error")
       setProgress(0)
-      setErrorMsg(error instanceof Error ? error.message : "Upload failed")
+      setErrorMsg(error instanceof Error ? error.message : RECEIPT_UNCERTAIN_ERROR)
+    } finally {
+      if (generation === generationRef.current) requestRef.current = null
+    }
+  }
+
+  async function checkSavedReceipt() {
+    if (!recoveryId || requestRef.current) return
+    const controller = new AbortController()
+    requestRef.current = controller
+    const generation = ++generationRef.current
+    setState("uploading")
+    setUploadStep("Checking saved receipt...")
+    try {
+      const data = await receiptRequest(`/api/receipts/${encodeURIComponent(recoveryId)}/review`, {}, controller, 10_000)
+      if (generation !== generationRef.current) return
+      if (data.ocrStatus === "PENDING") {
+        throw new Error("Your receipt is saved and may still be processing. Wait a moment, then check again before uploading another copy.")
+      }
+      router.push(`/scan/review?receiptId=${encodeURIComponent(recoveryId)}`)
+    } catch (error) {
+      if (generation !== generationRef.current) return
+      setState("error")
+      setProgress(0)
+      setErrorMsg(error instanceof Error ? error.message : RECEIPT_UNCERTAIN_ERROR)
+    } finally {
+      if (generation === generationRef.current) requestRef.current = null
     }
   }
 
@@ -464,9 +486,10 @@ export function ReceiptUploadForm() {
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">{errorMsg}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Please try again with a different image
+                Check for a saved receipt before uploading again. You can also enter items from Manual Entry.
               </p>
             </div>
+            {recoveryId && <Button variant="outline" size="sm" onClick={checkSavedReceipt}>Check saved receipt</Button>}
             <Button
               variant="outline"
               size="sm"
@@ -475,7 +498,7 @@ export function ReceiptUploadForm() {
                 setErrorMsg("")
               }}
             >
-              Retry
+              Dismiss
             </Button>
           </CardContent>
         </Card>

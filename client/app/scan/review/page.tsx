@@ -82,9 +82,9 @@ function getEmptyOcrContent(ocrStatus: string): {
 } {
   if (ocrStatus === "PENDING") {
     return {
-      testId: "ocr-disabled",
+      testId: "ocr-pending",
       message:
-        "Receipt scanning is disabled for this deployment. Ask the app administrator to enable server-side OCR, then return to Scan and upload the receipt again, or add items manually.",
+        "Your receipt is saved, but extracted items are not available yet. Scanning may still be processing or unavailable. Check again later before uploading another copy, or add items from Manual Entry.",
     }
   }
 
@@ -92,7 +92,7 @@ function getEmptyOcrContent(ocrStatus: string): {
     return {
       testId: "ocr-failed",
       message:
-        "We couldn't process this receipt because scanning failed. Return to Scan and try the upload again, or add items manually.",
+        "Your receipt image was saved, but scanning failed. Add items from Manual Entry, or contact the app administrator if scanning keeps failing.",
     }
   }
 

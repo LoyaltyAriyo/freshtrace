@@ -1,9 +1,11 @@
 import "server-only"
 
-import { Buffer } from "node:buffer"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+
+import { createOcrWorker, OcrTimeoutError, withinDeadline } from "@/lib/ocr-worker"
+import { convertHeifImage, isHeifImage } from "@/lib/receipt-image"
 
 import { NOISE_PATTERNS, parseFallbackReceiptItems } from "@/lib/fallback-parser"
 
@@ -25,6 +27,7 @@ export type OcrOutcomeStatus =
 	| "FALLBACK_USED"
 
 export type OcrFailureStage =
+	| "IMAGE_PREPARATION"
 	| "INITIALIZATION"
 	| "RECOGNITION"
 	| "PARSING"
@@ -52,21 +55,7 @@ type RuntimeAssetOptions = {
 export type OcrRuntimeAssets = {
 	langPath: string
 	workerPath: string
-}
-
-type OcrWorker = {
-	recognize: (image: Buffer) => Promise<{
-		data?: { text?: string; confidence?: number }
-	}>
-	terminate: () => Promise<unknown>
-}
-
-type TesseractModule = {
-	createWorker: (
-		langs: string,
-		oem: number,
-		options: Record<string, unknown>,
-	) => Promise<OcrWorker>
+	imageWorkerPath?: string
 }
 
 function isFile(candidate: string): boolean {
@@ -109,8 +98,8 @@ export function resolveOcrRuntimeAssets({
 }: RuntimeAssetOptions = {}): OcrRuntimeAssets | null {
 	const roots = Array.from(
 		new Set([
-			...getAncestorDirectories(moduleDirectory),
 			...getAncestorDirectories(cwd),
+			...getAncestorDirectories(moduleDirectory),
 		]),
 	)
 
@@ -134,6 +123,10 @@ export function resolveOcrRuntimeAssets({
 	return {
 		langPath: path.dirname(langFile),
 		workerPath: workerFile,
+		imageWorkerPath: firstExistingFile(roots.flatMap(root => [
+			path.join(root, "lib/receipt-image-worker.cjs"),
+			path.join(root, "client/lib/receipt-image-worker.cjs"),
+		]), fileExists) ?? undefined,
 	}
 }
 
@@ -216,40 +209,15 @@ function failedOutcome(
 	}
 }
 
-function createWorkerSafely(
-	tesseract: TesseractModule,
-	options: Record<string, unknown>,
-): Promise<OcrWorker> {
-	return new Promise((resolve, reject) => {
-		let settled = false
-		const rejectOnce = (error: unknown) => {
-			if (settled) return
-			settled = true
-			reject(error)
-		}
-
-		const workerPromise = tesseract.createWorker("eng", 1, {
-			...options,
-			// Prevent Tesseract.js worker job errors from becoming uncaught throws.
-			errorHandler: rejectOnce,
-		})
-
-		workerPromise.then(
-			(worker) => {
-				if (settled) {
-					void worker.terminate().catch(() => undefined)
-					return
-				}
-				settled = true
-				resolve(worker)
-			},
-			rejectOnce,
-		)
-	})
-}
-
 export async function extractReceiptDraftItems(
 	imageBytes: Uint8Array,
+	{ deadline = Date.now() + 60_000, initializationMs = 15_000, recognitionMs = 40_000, cleanupMs = 2_000, onStage }: {
+		deadline?: number
+		initializationMs?: number
+		recognitionMs?: number
+		cleanupMs?: number
+		onStage?: (stage: OcrFailureStage) => void
+	} = {},
 ): Promise<OcrExtractionResult> {
 	if (!isOcrEnabled()) {
 		return {
@@ -264,24 +232,29 @@ export async function extractReceiptDraftItems(
 		return failedOutcome("INITIALIZATION", "OCR_RUNTIME_ASSET_MISSING")
 	}
 
-	let worker: OcrWorker | undefined
+	let worker: ReturnType<typeof createOcrWorker> | undefined
 	let outcome: OcrExtractionResult | undefined
 	let stage: OcrFailureStage = "INITIALIZATION"
 
 	try {
-		const tesseract = (await import("tesseract.js")) as unknown as TesseractModule
-		worker = await createWorkerSafely(tesseract, {
-			langPath: runtimeAssets.langPath,
-			workerPath: runtimeAssets.workerPath,
-			cachePath: process.env.VERCEL ? "/tmp" : runtimeAssets.langPath,
-			cacheMethod: "none",
-			gzip: false,
-		})
+		if (isHeifImage(imageBytes)) {
+			stage = "IMAGE_PREPARATION"
+			onStage?.(stage)
+			if (!runtimeAssets.imageWorkerPath) return failedOutcome(stage, "OCR_IMAGE_DECODER_MISSING")
+			imageBytes = await convertHeifImage(imageBytes, runtimeAssets.imageWorkerPath,
+				Math.min(15_000, deadline - Date.now() - cleanupMs), cleanupMs)
+		}
+		stage = "INITIALIZATION"
+		onStage?.(stage)
+		worker = createOcrWorker(runtimeAssets.workerPath, runtimeAssets.langPath)
+		await withinDeadline(worker.initialize(), Math.min(initializationMs, deadline - Date.now() - cleanupMs))
 
 		stage = "RECOGNITION"
-		const result = await worker.recognize(Buffer.from(imageBytes))
+		onStage?.(stage)
+		const result = await withinDeadline(worker.recognize(imageBytes), Math.min(recognitionMs, deadline - Date.now() - cleanupMs))
 
 		stage = "PARSING"
+		onStage?.(stage)
 		const text = result?.data?.text ?? ""
 		const confidenceRaw = result?.data?.confidence
 		const confidence =
@@ -323,18 +296,21 @@ export async function extractReceiptDraftItems(
 					fallbackUsed: false,
 				}
 		}
-	} catch {
+	} catch (error) {
 		const category =
-			stage === "INITIALIZATION"
+			stage === "IMAGE_PREPARATION"
+				? "OCR_IMAGE_DECODE_FAILED"
+				: stage === "INITIALIZATION"
 				? "OCR_WORKER_INITIALIZATION_FAILED"
 				: stage === "RECOGNITION"
 					? "OCR_RECOGNITION_FAILED"
 					: "OCR_PARSING_FAILED"
-		outcome = failedOutcome(stage, category)
+		outcome = failedOutcome(stage, error instanceof OcrTimeoutError ? `OCR_${stage}_TIMEOUT` : category)
 	} finally {
 		if (worker) {
 			try {
-				await worker.terminate()
+				onStage?.("TERMINATION")
+				await withinDeadline(worker.terminate(), cleanupMs)
 			} catch {
 				if (outcome?.status === "FAILED" && outcome.failure) {
 					outcome.failure.terminationFailed = true

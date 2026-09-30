@@ -90,7 +90,7 @@ describe("ReviewPage", () => {
     ).toBeInTheDocument()
   })
 
-  it("shows a distinct disabled OCR state and allows returning to scan", async () => {
+  it("shows an uncertain pending OCR state and allows returning to scan", async () => {
     getSearchParamMock.mockReturnValue("receipt-123")
 
     const fetchMock = vi.fn().mockResolvedValue({
@@ -108,8 +108,8 @@ describe("ReviewPage", () => {
 
     render(<ReviewPage />)
 
-    expect(await screen.findByTestId("ocr-disabled")).toHaveTextContent(
-      /scanning is disabled for this deployment/i,
+    expect(await screen.findByTestId("ocr-pending")).toHaveTextContent(
+      /check again later before uploading another copy/i,
     )
 
     fireEvent.click(screen.getByRole("button", { name: /return to scan/i }))
@@ -136,7 +136,7 @@ describe("ReviewPage", () => {
     render(<ReviewPage />)
 
     expect(await screen.findByTestId("ocr-failed")).toHaveTextContent(
-      /couldn't process this receipt because scanning failed/i,
+      /receipt image was saved, but scanning failed/i,
     )
     expect(screen.getByRole("button", { name: /return to scan/i })).toBeEnabled()
   })
