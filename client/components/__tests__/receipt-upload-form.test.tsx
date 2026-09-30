@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 
 import { ReceiptUploadForm } from "../receipt-upload-form"
+import { SAMPLE_RECEIPT_URL, SAMPLE_RECEIPT_LOAD_ERROR } from "@/lib/sample-receipt"
 
 const pushMock = vi.fn()
 
@@ -177,6 +178,126 @@ describe("ReceiptUploadForm", () => {
     unmount()
     expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true)
     await act(async () => { resolveFetch({ ok: true, json: async () => ({ receiptId: "late" }) }) })
+    expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it("loads the sample bytes and submits through the normal receipt endpoint and review flow", async () => {
+    const blob = new Blob(["sample image bytes"], { type: "image/png" })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, blob: async () => blob })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ receiptId: "sample/123" }) })
+    vi.stubGlobal("fetch", fetchMock)
+    render(<ReceiptUploadForm />)
+    expect(screen.getByAltText("Sample grocery receipt listing vegetables and fruit")).toHaveAttribute("src", SAMPLE_RECEIPT_URL)
+    fireEvent.click(screen.getByRole("button", { name: "Scan sample receipt" }))
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/scan/review?receiptId=sample%2F123"))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0][0]).toBe(SAMPLE_RECEIPT_URL)
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ redirect: "error", signal: expect.any(AbortSignal) })
+    const [url, options] = fetchMock.mock.calls[1]
+    expect(url).toBe("/api/receipts")
+    expect(options).toMatchObject({ method: "POST", headers: { "x-receipt-request-id": expect.any(String) } })
+    const file = options.body.get("receipt") as File
+    expect(file.name).toBe("grocery-receipt.png")
+    expect(file.type).toBe("image/png")
+    expect(file.size).toBe(blob.size)
+    expect(options.signal).toBe(fetchMock.mock.calls[0][1].signal)
+  })
+
+  it.each(["http", "network", "html", "empty"])("allows a manual retry after sample load failure (%s) without posting", async failure => {
+    const fetchMock = vi.fn()
+    if (failure === "network") fetchMock.mockRejectedValueOnce(new Error("Offline"))
+    else fetchMock.mockResolvedValueOnce({
+      ok: failure !== "http",
+      blob: async () => new Blob(failure === "empty" ? [] : ["html"], { type: failure === "html" ? "text/html" : "image/png" }),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+    render(<ReceiptUploadForm />)
+    fireEvent.click(screen.getByRole("button", { name: "Scan sample receipt" }))
+    expect(await screen.findByText(SAMPLE_RECEIPT_LOAD_ERROR)).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(pushMock).not.toHaveBeenCalled()
+    expect(screen.queryByRole("button", { name: "Check saved receipt" })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Scan sample receipt" })).toBeEnabled()
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, blob: async () => new Blob(["png"], { type: "image/png" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ receiptId: "retry" }) })
+    fireEvent.click(screen.getByRole("button", { name: "Scan sample receipt" }))
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/scan/review?receiptId=retry"))
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it("locks sample, file, camera and drop submissions during asset loading and OCR", async () => {
+    let resolveBlob!: (blob: Blob) => void
+    let resolveUpload!: (response: unknown) => void
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, blob: () => new Promise<Blob>(resolve => { resolveBlob = resolve }) })
+      .mockImplementationOnce(() => new Promise(resolve => { resolveUpload = resolve }))
+    vi.stubGlobal("fetch", fetchMock)
+    render(<ReceiptUploadForm />)
+    const sample = screen.getByRole("button", { name: "Scan sample receipt" })
+    const input = screen.getByLabelText("Upload receipt image")
+    const files = [new File(["data"], "own.jpg", { type: "image/jpeg" })]
+    fireEvent.click(sample)
+    await waitFor(() => expect(resolveBlob).toBeTypeOf("function"))
+    expect(screen.getByText("Loading sample receipt...")).toBeInTheDocument()
+    expect(sample).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Choose File" })).toBeDisabled()
+    expect(screen.getByLabelText("Capture receipt photo")).toBeDisabled()
+    expect(input).toBeDisabled()
+    fireEvent.click(sample)
+    fireEvent.change(input, { target: { files } })
+    fireEvent.drop(screen.getByText("Drag and drop a receipt image here"), { dataTransfer: { files } })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await act(async () => { resolveBlob(new Blob(["png"], { type: "image/png" })) })
+    expect(screen.getByText("Uploading and processing receipt...")).toBeInTheDocument()
+    fireEvent.click(sample)
+    fireEvent.drop(screen.getByText("Drag and drop a receipt image here"), { dataTransfer: { files } })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await act(async () => { resolveUpload({ ok: true, json: async () => ({ receiptId: "only-once" }) }) })
+    expect(pushMock).toHaveBeenCalledOnce()
+  })
+
+  it("blocks sample loading while a regular upload is processing", () => {
+    const fetchMock = vi.fn().mockReturnValue(new Promise(() => {}))
+    vi.stubGlobal("fetch", fetchMock)
+    render(<ReceiptUploadForm />)
+    fireEvent.change(screen.getByLabelText("Upload receipt image"), { target: { files: [new File(["png"], "own.png", { type: "image/png" })] } })
+    const sample = screen.getByRole("button", { name: "Scan sample receipt" })
+    expect(sample).toBeDisabled()
+    fireEvent.click(sample)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/receipts")
+  })
+
+  it("times out a stalled sample body and ignores it after a newer upload", async () => {
+    vi.useFakeTimers()
+    let resolveBlob!: (blob: Blob) => void
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, blob: () => new Promise<Blob>(resolve => { resolveBlob = resolve }) })
+    vi.stubGlobal("fetch", fetchMock)
+    render(<ReceiptUploadForm />)
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Scan sample receipt" })) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+    expect(screen.getByText(SAMPLE_RECEIPT_LOAD_ERROR)).toBeInTheDocument()
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true)
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ receiptId: "newer" }) })
+    await act(async () => { fireEvent.change(screen.getByLabelText("Upload receipt image"), { target: { files: [new File(["png"], "own.png", { type: "image/png" })] } }) })
+    await act(async () => { resolveBlob(new Blob(["late"], { type: "image/png" })) })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(pushMock).toHaveBeenCalledExactlyOnceWith("/scan/review?receiptId=newer")
+  })
+
+  it("aborts sample loading on unmount without uploading a late asset", async () => {
+    let resolveBlob!: (blob: Blob) => void
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, blob: () => new Promise<Blob>(resolve => { resolveBlob = resolve }) })
+    vi.stubGlobal("fetch", fetchMock)
+    const { unmount } = render(<ReceiptUploadForm />)
+    fireEvent.click(screen.getByRole("button", { name: "Scan sample receipt" }))
+    await waitFor(() => expect(resolveBlob).toBeTypeOf("function"))
+    unmount()
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true)
+    await act(async () => { resolveBlob(new Blob(["late"], { type: "image/png" })) })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(pushMock).not.toHaveBeenCalled()
   })
 

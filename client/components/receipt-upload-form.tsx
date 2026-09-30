@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Camera, Upload, ImageIcon, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,6 +11,7 @@ import { useIsMobile } from "@/components/ui/use-mobile"
 import { cn } from "@/lib/utils"
 import { receiptRequest, RECEIPT_UNCERTAIN_ERROR } from "@/lib/receipt-request"
 import { MAX_RECEIPT_FILE_BYTES, RECEIPT_IMAGE_TYPES, RECEIPT_SIZE_ERROR, RECEIPT_TYPE_ERROR } from "@/lib/receipt-upload"
+import { loadSampleReceipt, SAMPLE_RECEIPT_URL } from "@/lib/sample-receipt"
 
 type UploadState = "idle" | "uploading" | "error"
 
@@ -211,32 +213,28 @@ export function ReceiptUploadForm() {
     setCameraError(null)
   }
 
-  async function handleFile(file: File | undefined) {
-    if (!file || requestRef.current) return
-
-    if (!RECEIPT_IMAGE_TYPES.has(file.type)) {
-      setState("error")
-      setErrorMsg(RECEIPT_TYPE_ERROR)
-      return
-    }
-
-    if (file.size > MAX_RECEIPT_FILE_BYTES) {
-      setState("error")
-      setErrorMsg(RECEIPT_SIZE_ERROR)
-      return
-    }
-
+  async function handleFile(source: File | undefined | typeof loadSampleReceipt) {
+    if (!source || requestRef.current) return
+    const loadingSample = typeof source === "function"
     const controller = new AbortController()
     requestRef.current = controller // Synchronous guard also covers drop/input events.
     const generation = ++generationRef.current
-    const requestId = crypto.randomUUID()
-    setRecoveryId(requestId)
+    setRecoveryId(null)
     setState("uploading")
-    setProgress(25)
-    setUploadStep("Uploading and processing receipt...")
+    setProgress(loadingSample ? 10 : 25)
+    setUploadStep(loadingSample ? "Loading sample receipt..." : "Uploading and processing receipt...")
     setErrorMsg("")
 
     try {
+      const file = typeof source === "function" ? await source(controller) : source
+      if (generation !== generationRef.current) return
+      if (!RECEIPT_IMAGE_TYPES.has(file.type)) throw new Error(RECEIPT_TYPE_ERROR)
+      if (file.size > MAX_RECEIPT_FILE_BYTES) throw new Error(RECEIPT_SIZE_ERROR)
+
+      const requestId = crypto.randomUUID()
+      setRecoveryId(requestId)
+      setProgress(25)
+      setUploadStep("Uploading and processing receipt...")
       const formData = new FormData()
       formData.append("receipt", file)
       const data = await receiptRequest("/api/receipts", {
@@ -368,6 +366,36 @@ export function ReceiptUploadForm() {
         </Card>
       </div>
 
+      <Card className="py-4">
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <figure className="shrink-0 text-center">
+              <Image
+                src={SAMPLE_RECEIPT_URL}
+                alt="Sample grocery receipt listing vegetables and fruit"
+                width={754}
+                height={900}
+                unoptimized
+                className="h-20 w-16 rounded-md border bg-muted object-contain"
+              />
+              <figcaption className="mt-1 text-[10px] text-muted-foreground">Sample receipt</figcaption>
+            </figure>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">No receipt handy?</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Try a sample receipt to see how scanning works.</p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            className="min-h-11 w-full sm:w-auto"
+            disabled={state === "uploading"}
+            onClick={() => handleFile(loadSampleReceipt)}
+          >
+            Scan sample receipt
+          </Button>
+        </CardContent>
+      </Card>
+
       {!isMobile && (isWebcamActive || capturedImage) && (
         <Card>
           <CardHeader>
@@ -486,7 +514,9 @@ export function ReceiptUploadForm() {
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">{errorMsg}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Check for a saved receipt before uploading again. You can also enter items from Manual Entry.
+                {recoveryId
+                  ? "Check for a saved receipt before uploading again. You can also enter items from Manual Entry."
+                  : "Try again when ready. You can also upload your own receipt or use Manual Entry."}
               </p>
             </div>
             {recoveryId && <Button variant="outline" size="sm" onClick={checkSavedReceipt}>Check saved receipt</Button>}
@@ -511,6 +541,7 @@ export function ReceiptUploadForm() {
         accept="image/*"
         capture="environment"
         className="sr-only"
+        disabled={state === "uploading"}
         onChange={(e) => handleFile(e.target.files?.[0])}
         aria-label="Capture receipt photo"
       />
@@ -521,6 +552,7 @@ export function ReceiptUploadForm() {
         type="file"
         accept="image/*"
         className="sr-only"
+        disabled={state === "uploading"}
         onChange={(e) => handleFile(e.target.files?.[0])}
         aria-label="Upload receipt image"
       />
