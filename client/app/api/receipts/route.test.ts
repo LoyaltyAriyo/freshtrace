@@ -1,3 +1,5 @@
+vi.mock("server-only", () => ({}))
+
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
 const loggerMocks = vi.hoisted(() => ({
@@ -36,6 +38,7 @@ vi.mock("@/lib/auth", () => {
 })
 
 vi.mock("@/lib/prisma", () => {
+  const findReceiptMock = vi.fn()
   const createReceiptMock = vi.fn()
   const updateReceiptMock = vi.fn()
   const createDraftItemsMock = vi.fn()
@@ -45,6 +48,7 @@ vi.mock("@/lib/prisma", () => {
   return {
     prisma: {
       receipt: {
+        findUnique: findReceiptMock,
         create: createReceiptMock,
         update: updateReceiptMock,
       },
@@ -56,6 +60,7 @@ vi.mock("@/lib/prisma", () => {
         createMany: createCategoriesMock,
       },
     },
+    findReceiptMock,
     createReceiptMock,
     updateReceiptMock,
     createDraftItemsMock,
@@ -78,7 +83,7 @@ import { POST } from "./route"
 // @ts-expect-error - test-only mocked exports
 import { uploadMock, removeMock, downloadMock } from "@/lib/supabase/server"
 // @ts-expect-error - test-only mocked exports
-import { createReceiptMock } from "@/lib/prisma"
+import { createReceiptMock, findReceiptMock } from "@/lib/prisma"
 // @ts-expect-error - test-only mocked exports
 import { updateReceiptMock, createDraftItemsMock, findCategoriesMock, createCategoriesMock } from "@/lib/prisma"
 // @ts-expect-error - test-only mocked exports
@@ -93,6 +98,7 @@ function makeTestRequest(formData: FormData): Request {
 
 describe("POST /api/receipts route", () => {
   beforeEach(() => {
+    findReceiptMock.mockReset()
     uploadMock.mockReset()
     removeMock.mockReset()
     downloadMock.mockReset()
@@ -122,11 +128,11 @@ describe("POST /api/receipts route", () => {
     expect(body.error).toMatch(/No receipt file uploaded/i)
   })
 
-  it("returns 400 for invalid MIME type", async () => {
+  it.each(["text/plain", "application/pdf"])("returns 400 for unsupported MIME type %s before saving", async (type) => {
     const formData = new FormData()
     formData.append(
       "receipt",
-      new File(["data"], "test.txt", { type: "text/plain" })
+      new File(["data"], type === "application/pdf" ? "receipt.pdf" : "test.txt", { type })
     )
 
     const request = makeTestRequest(formData)
@@ -136,6 +142,9 @@ describe("POST /api/receipts route", () => {
     expect(response.status).toBe(400)
     const body = await response.json()
     expect(body.error).toMatch(/Invalid file type/i)
+    expect(uploadMock).not.toHaveBeenCalled()
+    expect(createReceiptMock).not.toHaveBeenCalled()
+    expect(extractReceiptDraftItemsMock).not.toHaveBeenCalled()
   })
 
   it("returns 413 for oversized file", async () => {
@@ -460,4 +469,48 @@ describe("POST /api/receipts route", () => {
     expect(Array.isArray(removeArgs)).toBe(true)
     expect(removeArgs[0]).toEqual(expect.any(String))
   })
+  it("returns the owned receipt for a repeated request without another upload", async () => {
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    findReceiptMock.mockResolvedValue({ id, userId: "user-123", ocrStatus: "PENDING" })
+    const request = makeTestRequest(new FormData())
+    request.headers.set("x-receipt-request-id", id)
+    const response = await POST(request)
+    expect(await response.json()).toMatchObject({ receiptId: id })
+    expect(uploadMock).not.toHaveBeenCalled()
+  })
+
+  it("does not return another user's receipt for a reused ID", async () => {
+    findReceiptMock.mockResolvedValue({ id: "other", userId: "other-user", ocrStatus: "SUCCESS" })
+    const request = makeTestRequest(new FormData())
+    request.headers.set("x-receipt-request-id", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    expect((await POST(request)).status).toBe(409)
+    expect(uploadMock).not.toHaveBeenCalled()
+  })
+
+  it("preserves the saved image and returns its receipt ID when saving drafts fails", async () => {
+    uploadMock.mockResolvedValue({ error: null })
+    createReceiptMock.mockResolvedValue({ id: "receipt-123" })
+    downloadMock.mockResolvedValue({ data: new Blob(["data"]), error: null })
+    extractReceiptDraftItemsMock.mockResolvedValue({ status: "SUCCESS", items: [{ name: "Milk", quantity: 1, confidence: 0.9 }] })
+    createDraftItemsMock.mockRejectedValue(new Error("write failed"))
+    const form = new FormData()
+    form.append("receipt", new File(["data"], "receipt.jpg", { type: "image/jpeg" }))
+    const response = await POST(makeTestRequest(form))
+    expect(response.status).toBe(500)
+    expect(await response.json()).toMatchObject({ receiptId: "receipt-123", ocrStatus: "FAILED" })
+    expect(removeMock).not.toHaveBeenCalled()
+    expect(updateReceiptMock).toHaveBeenCalledWith({ where: { id: "receipt-123" }, data: { ocrStatus: "FAILED" } })
+  })
+
+  it("checks an ambiguous creation failure before removing the uploaded image", async () => {
+    uploadMock.mockResolvedValue({ error: null })
+    createReceiptMock.mockRejectedValue(new Error("response lost after commit"))
+    findReceiptMock.mockResolvedValue({ id: "receipt-123", userId: "user-123" })
+    const form = new FormData()
+    form.append("receipt", new File(["data"], "receipt.jpg", { type: "image/jpeg" }))
+    const response = await POST(makeTestRequest(form))
+    expect(await response.json()).toMatchObject({ receiptId: "receipt-123" })
+    expect(removeMock).not.toHaveBeenCalled()
+  })
+
 })

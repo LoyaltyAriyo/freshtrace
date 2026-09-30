@@ -12,10 +12,16 @@ const tesseractMocks = vi.hoisted(() => ({
 const fallbackMocks = vi.hoisted(() => ({
 	parse: vi.fn(),
 }))
+const imageMocks = vi.hoisted(() => ({ convert: vi.fn() }))
 
 vi.mock("server-only", () => ({}))
-vi.mock("tesseract.js", () => ({
-	createWorker: tesseractMocks.createWorker,
+vi.mock("@/lib/receipt-image", async importOriginal => ({
+	...await importOriginal<typeof import("@/lib/receipt-image")>(),
+	convertHeifImage: imageMocks.convert,
+}))
+vi.mock("@/lib/ocr-worker", async (importOriginal) => ({
+	...await importOriginal<typeof import("@/lib/ocr-worker")>(),
+	createOcrWorker: tesseractMocks.createWorker,
 }))
 vi.mock("@/lib/fallback-parser", async (importOriginal) => {
 	const original = await importOriginal<typeof import("@/lib/fallback-parser")>()
@@ -51,7 +57,7 @@ function makeWorker({
 		? vi.fn().mockRejectedValue(terminationError)
 		: vi.fn().mockResolvedValue(undefined)
 
-	return { recognize, terminate }
+	return { initialize: vi.fn().mockResolvedValue(undefined), recognize, terminate }
 }
 
 describe("OCR runtime", () => {
@@ -59,6 +65,7 @@ describe("OCR runtime", () => {
 		vi.unstubAllEnvs()
 		tesseractMocks.createWorker.mockReset()
 		fallbackMocks.parse.mockReset().mockReturnValue([])
+		imageMocks.convert.mockReset()
 	})
 
 	afterEach(() => {
@@ -98,7 +105,7 @@ describe("OCR runtime", () => {
 	it("starts OCR and preserves successful recognition and parsing", async () => {
 		vi.stubEnv("TESSERACT_ENABLED", "true")
 		const worker = makeWorker({ text: "2 Milk $3.99\nBread", confidence: 88 })
-		tesseractMocks.createWorker.mockResolvedValue(worker)
+		tesseractMocks.createWorker.mockReturnValue(worker)
 
 		const result = await extractReceiptDraftItems(new Uint8Array([1, 2, 3]))
 
@@ -112,23 +119,43 @@ describe("OCR runtime", () => {
 		})
 		expect(tesseractMocks.createWorker).toHaveBeenCalledOnce()
 		expect(tesseractMocks.createWorker).toHaveBeenCalledWith(
-			"eng",
-			1,
-			expect.objectContaining({
-				cacheMethod: "none",
-				gzip: false,
-				langPath: expect.not.stringMatching(/^https?:/),
-				workerPath: expect.stringContaining("worker-script/node/index.js"),
-				errorHandler: expect.any(Function),
-			}),
+			expect.stringContaining("worker-script/node/index.js"),
+			expect.not.stringMatching(/^https?:/),
 		)
 		expect(worker.terminate).toHaveBeenCalledOnce()
+	})
+
+	it("converts HEIC bytes before handing the image to Tesseract", async () => {
+		vi.stubEnv("TESSERACT_ENABLED", "true")
+		const original = Buffer.alloc(20)
+		original.writeUInt32BE(20)
+		original.write("ftypheic", 4)
+		const converted = new Uint8Array([1, 2, 3])
+		imageMocks.convert.mockResolvedValue(converted)
+		const worker = makeWorker()
+		tesseractMocks.createWorker.mockReturnValue(worker)
+		const result = await extractReceiptDraftItems(original)
+		expect(result.status).toBe("SUCCESS")
+		expect(imageMocks.convert).toHaveBeenCalledOnce()
+		expect(worker.recognize).toHaveBeenCalledWith(converted)
+	})
+
+	it("reports decoding failure without initializing an OCR thread", async () => {
+		vi.stubEnv("TESSERACT_ENABLED", "true")
+		const original = Buffer.alloc(20)
+		original.writeUInt32BE(20)
+		original.write("ftypheic", 4)
+		imageMocks.convert.mockRejectedValue(new Error("private data"))
+		await expect(extractReceiptDraftItems(original)).resolves.toMatchObject({
+			status: "FAILED", failure: { stage: "IMAGE_PREPARATION", category: "OCR_IMAGE_DECODE_FAILED" },
+		})
+		expect(tesseractMocks.createWorker).not.toHaveBeenCalled()
 	})
 
 	it("returns NO_ITEMS after successful recognition with no usable items", async () => {
 		vi.stubEnv("TESSERACT_ENABLED", "true")
 		const worker = makeWorker({ text: "1234\n$$$" })
-		tesseractMocks.createWorker.mockResolvedValue(worker)
+		tesseractMocks.createWorker.mockReturnValue(worker)
 
 		await expect(extractReceiptDraftItems(new Uint8Array([1]))).resolves.toEqual({
 			status: "NO_ITEMS",
@@ -141,7 +168,7 @@ describe("OCR runtime", () => {
 	it("returns FALLBACK_USED when the fallback parser finds items", async () => {
 		vi.stubEnv("TESSERACT_ENABLED", "true")
 		const worker = makeWorker({ text: "1234" })
-		tesseractMocks.createWorker.mockResolvedValue(worker)
+		tesseractMocks.createWorker.mockReturnValue(worker)
 		fallbackMocks.parse.mockReturnValue([{ name: "Bread", quantity: 1 }])
 
 		await expect(extractReceiptDraftItems(new Uint8Array([1]))).resolves.toEqual({
@@ -154,7 +181,7 @@ describe("OCR runtime", () => {
 
 	it("classifies worker initialization rejection", async () => {
 		vi.stubEnv("TESSERACT_ENABLED", "true")
-		tesseractMocks.createWorker.mockRejectedValue(new Error("initialization failed"))
+		tesseractMocks.createWorker.mockImplementation(() => { throw new Error("initialization failed") })
 
 		await expect(extractReceiptDraftItems(new Uint8Array([1]))).resolves.toMatchObject({
 			status: "FAILED",
@@ -165,30 +192,31 @@ describe("OCR runtime", () => {
 		})
 	})
 
-	it("captures asynchronous worker initialization errors through the supported handler", async () => {
+	it.each(["INITIALIZATION", "RECOGNITION"])("bounds stalled %s and kills its worker", async (stage) => {
 		vi.stubEnv("TESSERACT_ENABLED", "true")
-		tesseractMocks.createWorker.mockImplementation((
-			_langs: string,
-			_oem: number,
-			options: { errorHandler: (error: unknown) => void },
-		) => {
-			queueMicrotask(() => options.errorHandler(new Error("worker job failed")))
-			return new Promise(() => undefined)
-		})
+		const worker = makeWorker()
+		worker[stage === "INITIALIZATION" ? "initialize" : "recognize"].mockReturnValue(new Promise(() => {}))
+		tesseractMocks.createWorker.mockReturnValue(worker)
+		const result = await extractReceiptDraftItems(new Uint8Array([1]), { initializationMs: 10, recognitionMs: 10 })
+		expect(result).toMatchObject({ status: "FAILED", failure: { stage, category: `OCR_${stage}_TIMEOUT` } })
+		expect(worker.terminate).toHaveBeenCalledOnce()
+	})
 
-		await expect(extractReceiptDraftItems(new Uint8Array([1]))).resolves.toMatchObject({
-			status: "FAILED",
-			failure: {
-				stage: "INITIALIZATION",
-				category: "OCR_WORKER_INITIALIZATION_FAILED",
-			},
+	it("bounds stalled cleanup after issuing forced termination", async () => {
+		vi.stubEnv("TESSERACT_ENABLED", "true")
+		const worker = makeWorker()
+		worker.terminate.mockReturnValue(new Promise(() => {}))
+		tesseractMocks.createWorker.mockReturnValue(worker)
+		await expect(extractReceiptDraftItems(new Uint8Array([1]), { cleanupMs: 10 })).resolves.toMatchObject({
+			status: "FAILED", failure: { stage: "TERMINATION" },
 		})
+		expect(worker.terminate).toHaveBeenCalledOnce()
 	})
 
 	it("terminates and classifies a recognition rejection", async () => {
 		vi.stubEnv("TESSERACT_ENABLED", "true")
 		const worker = makeWorker({ recognitionError: new Error("recognition failed") })
-		tesseractMocks.createWorker.mockResolvedValue(worker)
+		tesseractMocks.createWorker.mockReturnValue(worker)
 
 		await expect(extractReceiptDraftItems(new Uint8Array([1]))).resolves.toMatchObject({
 			status: "FAILED",
@@ -203,7 +231,7 @@ describe("OCR runtime", () => {
 	it("terminates and classifies a parsing failure", async () => {
 		vi.stubEnv("TESSERACT_ENABLED", "true")
 		const worker = makeWorker({ text: "1234" })
-		tesseractMocks.createWorker.mockResolvedValue(worker)
+		tesseractMocks.createWorker.mockReturnValue(worker)
 		fallbackMocks.parse.mockImplementation(() => {
 			throw new Error("parser failed")
 		})
@@ -221,7 +249,7 @@ describe("OCR runtime", () => {
 	it("reports termination failure after otherwise successful OCR", async () => {
 		vi.stubEnv("TESSERACT_ENABLED", "true")
 		const worker = makeWorker({ terminationError: new Error("terminate failed") })
-		tesseractMocks.createWorker.mockResolvedValue(worker)
+		tesseractMocks.createWorker.mockReturnValue(worker)
 
 		await expect(extractReceiptDraftItems(new Uint8Array([1]))).resolves.toMatchObject({
 			status: "FAILED",
@@ -238,7 +266,7 @@ describe("OCR runtime", () => {
 			recognitionError: new Error("recognition failed"),
 			terminationError: new Error("terminate failed"),
 		})
-		tesseractMocks.createWorker.mockResolvedValue(worker)
+		tesseractMocks.createWorker.mockReturnValue(worker)
 
 		await expect(extractReceiptDraftItems(new Uint8Array([1]))).resolves.toMatchObject({
 			status: "FAILED",

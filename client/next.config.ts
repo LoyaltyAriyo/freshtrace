@@ -2,12 +2,21 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const ocrRuntimeFiles = [
+  "./lib/receipt-image-worker.cjs",
+  "./node_modules/heic-convert/**/*",
+  "./node_modules/heic-decode/**/*",
+  "./node_modules/libheif-js/**/*",
+  "./node_modules/jpeg-js/**/*",
+  "./node_modules/pngjs/**/*",
   "./eng.traineddata",
-  "./node_modules/tesseract.js/src/worker-script/index.js",
-  "./node_modules/tesseract.js/src/worker-script/constants/**/*",
-  "./node_modules/tesseract.js/src/worker-script/node/**/*",
-  "./node_modules/tesseract.js/src/worker-script/utils/**/*",
+  // worker_threads entry points are invisible to Turbopack's dependency graph.
+  // Include sibling constants/utils too, plus packages required only by the worker.
+  "./node_modules/tesseract.js/src/**/*",
   "./node_modules/tesseract.js-core/**/*",
+  "./node_modules/wasm-feature-detect/**/*",
+  "./node_modules/bmp-js/**/*",
+  "./node_modules/is-url/**/*",
+  "./node_modules/regenerator-runtime/**/*",
 ];
 
 const nextConfig: NextConfig = {
